@@ -58,7 +58,7 @@ function renderGallery(images) {
     card.className = 'image-card';
     card.id = `img-${img._id}`;
     card.innerHTML = `
-      <img src="${img.path}" alt="${img.filename}" loading="lazy" />
+      <img src="${img.path}" alt="${img.filename}" />
       <div class="card-details">
         <div>
           <p class="image-name">${img.filename}</p>
@@ -75,6 +75,7 @@ function renderGallery(images) {
     `;
     imageGallery.appendChild(card);
   });
+  console.log('[renderGallery] Gallery HTML:', imageGallery.innerHTML);
 }
 
 async function loadImages() {
@@ -166,8 +167,12 @@ form.addEventListener('submit', (e) => {
         submitBtn.textContent = 'Upload';
 
         if (data.data) {
+          console.log('[Upload] Prepending image to gallery:', data.data);
           AppState.images = [data.data, ...AppState.images];
           renderGallery(AppState.images);
+        } else {
+          console.warn('[Upload] data.data is undefined — calling loadImages()');
+          loadImages();
         }
       } else {
         showMessage(data.error || 'Upload failed.', 'error');
