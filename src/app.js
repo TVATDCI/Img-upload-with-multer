@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
@@ -14,8 +15,9 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
+app.use(helmet());
 app.use(cors({ origin: env.cors.origin }));
-app.use(express.json());
+app.use(express.json({ limit: "10kb" }));
 
 const uploadDir = path.resolve(__dirname, "..", env.uploadsFolder);
 if (!fs.existsSync(uploadDir)) {
