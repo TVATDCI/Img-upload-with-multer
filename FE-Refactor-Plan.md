@@ -1,215 +1,97 @@
-# **State Management**, **Dynamic UI rendering**, and the **Delete functionality**
+# Frontend Refactor Plan
+
+## Phase Status: ALL COMPLETE
+
+This document tracks the implementation status of the frontend refactoring plan.
 
 ---
 
-## 📋 Enhanced Refactoring & Feature Implementation Plan
+## ✅ Phase 1: Modular File Extraction — COMPLETE
 
-### Phase 1: Modular File Extraction
+- **CSS Extraction**: All styles moved to `public/styles.css` with CSS Variables for all colors and spacing
+- **JavaScript Modularization**: All logic extracted to `public/app.js` with clean separation
+- **Semantic HTML**: `public/index.html` contains only structure — no inline styles or scripts
 
-- **CSS Extraction**: Move all styles to `public/styles.css`. Ensure the use of **CSS Variables** for colors (primary, success, danger) to make the UI easily themeable.
-- **JavaScript Modularization**: Extract logic to `public/app.js`. Use an **Immediately Invoked Function Expression (IIFE)** or **ES Modules** to avoid polluting the global namespace.
-- **Semantic HTML**: Clean `public/index.html` to only include the structure. Ensure the gallery container has a clear ID (e.g., `#image-gallery`) for dynamic injection.
+## ✅ Phase 2: Backend & Middleware Alignment — COMPLETE
 
-### Phase 2: Backend & Middleware Alignment
+- **Static Serving**: `src/app.js` serves `public/` at `/` using `express.static`
+- **Dynamic API URL**: Frontend uses relative path `API = '/'` — works in both local and production
 
-- **Static Serving**: Configure `app.js` to serve the `public` folder using `express.static('public')`.
-- **Dynamic API URL**: Ensure the frontend uses a relative path (e.g., `/images`) or a configurable base URL so it works in both local and production environments.
+## ✅ Phase 3: Delete Logic & Gallery UI — COMPLETE
 
-### Phase 3: The "Delete" Logic & Gallery UI
+- **Delete Button**: Each image card has a "Delete" button
+- **Delete Handler**: Sends `DELETE` request to `/images/:id`, removes card from DOM on success
+- **Confirmation Dialog**: `window.confirm()` prevents accidental deletion
+- **404 Handling**: If DELETE returns 404, card is still removed (stays in sync with server state)
 
-- **Dynamic Action Buttons**: Update the `loadImages()` function in `app.js` to append a "Delete" button to each image card.
-- **Delete Event Handler**:
-  - Implement an `async deleteImage(id)` function.
-  - It must send a `DELETE` request to `/images/:id`.
-  - On success, it should remove the specific DOM element from the gallery without a full page reload.
-- **Confirmation UI**: Add a simple `window.confirm()` or a custom modal before executing the delete request to prevent accidental data loss.
+## ✅ Phase 4: Professional UX Improvements — COMPLETE
 
-### Phase 4: Professional UX Improvements
+- **Loading Spinner**: Shows while images are being fetched
+- **Empty State**: Displays "No images uploaded yet." when gallery is empty
+- **Toast Notifications**: Success (green) and Error (red) messages with 5s auto-hide
+- **Client-Side Validation**: File size check (max 200KB) and MIME type validation on file select
+- **Accessibility**: `aria-label` on delete buttons
+- **Storage Origin Badges**: Each card shows "Cloudinary" (blue) or "Local" (yellow) badge
 
-- **Loading States**: Add a "Loading..." spinner or text while images are being fetched or uploaded.
-- **Empty State**: Display a "No images uploaded yet" message if the `GET /images` array is empty.
-- **Toast Notifications**: Refine the message display system to handle multiple types of alerts (Success, Error, Info) with distinct color coding.
-- **Client-Side Validation**: Implement an immediate check in `app.js` to verify file size is under **200KB** and matches allowed mimetypes (**JPEG, PNG, GIF, WebP**) before the upload starts.
-- **Accessibility (a11y)**: Add `aria-label` attributes to the "Delete" buttons and implement focus management so the user doesn't lose their place after an item is removed from the gallery.
-- **Storage Origin Indicators**: Add a small UI badge to each image card identifying if it is served via **Cloudinary** or **Local Fallback** based on the image `path`.
+## ✅ Phase 5: Environment & Deployment Sync — COMPLETE
 
-Phase 5: Environment & Deployment Sync
-
-_Add this as a new section to ensure your backend and frontend communicate perfectly:_
-
-- **Path Normalization**: Use `path.join(__dirname, 'public')` in `app.js` to ensure the static folder is served correctly across different operating systems.
-- **CORS Alignment**: Double-check that `ALLOWED_ORIGINS` in the `.env` file matches the frontend's origin to prevent "Blocked by CORS" errors during testing.
+- **Path Normalization**: Uses `path.resolve()` and `fileURLToPath` for cross-OS compatibility
+- **CORS Alignment**: Supports multiple origins (comma-separated in `ALLOWED_ORIGINS` env var)
+- **Dual Origin Support**: Both `http://localhost:5500` and `http://127.0.0.1:5500` are supported
 
 ---
 
-## 🤖 Additional to implementation
+## Additional Implementation
 
-> **Prompt 1 (Setup):** "Refactor the current `index.html` by extracting all CSS into `public/styles.css` and all JS into `public/app.js`. In `app.js`, wrap the logic in a DOMContentLoaded event listener to ensure the HTML is fully loaded before execution."
+### Image Proxy Endpoint (`GET /images/:id/src`)
 
-> **Prompt 2 (Backend):** "Update `app.js` in the root directory to serve the `public` folder as static files. Verify that the CORS configuration allows requests from the frontend origin defined in the `.env` file."
+Since Cloudinary CDN URLs can be blocked by certain network configurations (VPNs, proxies, firewalls), a proxy endpoint was added to serve images through the Express server:
 
-> **Prompt 3 (Delete Feature):** "Modify the gallery rendering logic in `app.js`. Each image card should now include a 'Delete' button. Create a function that handles the DELETE request to `/images/:id` and updates the UI by removing the deleted image's card from the DOM upon success."
+- **Cloudinary images**: Server fetches from Cloudinary, streams back to browser as same-origin response
+- **Local images**: Server serves from `./uploads/` directory
+- **Browser benefit**: Browser loads image from `localhost:3001/images/:id/src` — same origin, no CDN blocking
 
-> **Prompt 4 (UX Refinement):** "Improve the feedback system. When an image is deleting, change the button text to 'Deleting...'. If the gallery is empty after a fetch, display a centered 'No images found' message in the gallery container."
+### AppState Pattern
 
-> **Final Polish Instruction:** "Before completing the refactor, perform a 'Clean Code' pass:
->
-> 1. Replace all hardcoded colors in `styles.css` with CSS variables.
-> 2. Ensure every `async/await` block has a `try/catch` wrapper that triggers a user-facing notification.
-> 3. Add a 'Health Check' console log that fires only when the frontend successfully connects to the backend `/images` endpoint."
-
-This CSS Grid layout provides a responsive, professional "masonry-style" appearance that adapts to different screen sizes without needing complex media queries. It also includes the styling for the **Delete** button requested.
-
-### 1. The CSS Grid Layout (`public/styles.css`)
-
-This code utilizes `auto-fill` and `minmax` to ensure the gallery looks clean on both mobile and desktop.
-
-```css
-/* Gallery Container */
-#image-gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.5rem;
-  padding: 1rem 0;
-}
-
-/* Image Card */
-.image-card {
-  background: #ffffff;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-  display: flex;
-  flex-direction: column;
-}
-
-.image-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-}
-
-.image-card img {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-/* Card Content & Action Area */
-.card-details {
-  padding: 1rem;
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.image-name {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #374151;
-  word-break: break-all;
-  margin-bottom: 0.5rem;
-}
-
-/* Delete Button Styling */
-.btn-delete {
-  background-color: #fee2e2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
-  padding: 0.5rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.75rem;
-  font-weight: 600;
-  transition: all 0.2s ease;
-  text-align: center;
-}
-
-.btn-delete:hover {
-  background-color: #dc2626;
-  color: #ffffff;
-}
-
-.btn-delete:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-```
-
----
-
-### 2. Implementation Logic for your Agent (`public/app.js`)
-
-To make the delete button functional should implement the `loadImages` function like this:
+`public/app.js` uses a simple `AppState` object to manage frontend state:
 
 ```javascript
-async function loadImages() {
-  const gallery = document.getElementById('image-gallery');
-  try {
-    const response = await fetch('/images');
-    const { data } = await response.json();
-
-    if (data.length === 0) {
-      gallery.innerHTML = '<p class="empty-state">No images uploaded yet.</p>';
-      return;
-    }
-
-    gallery.innerHTML = data
-      .map(
-        (img) => `
-            <div class="image-card" id="img-${img._id}">
-                <img src="${img.path}" alt="${img.filename}" loading="lazy">
-                <div class="card-details">
-                    <span class="image-name">${img.filename}</span>
-                    <button class="btn-delete" onclick="deleteImage('${img._id}')">
-                        Delete Image
-                    </button>
-                </div>
-            </div>
-        `
-      )
-      .join('');
-  } catch (err) {
-    console.error('Failed to load gallery:', err);
-  }
-}
-
-async function deleteImage(id) {
-  if (!confirm('Are you sure you want to delete this image?')) return;
-
-  const btn = document.querySelector(`#img-${id} .btn-delete`);
-  btn.disabled = true;
-  btn.innerText = 'Deleting...';
-
-  try {
-    const response = await fetch(`/images/${id}`, { method: 'DELETE' });
-    const result = await response.json();
-
-    if (result.success) {
-      document.getElementById(`img-${id}`).remove();
-    } else {
-      alert('Delete failed: ' + result.error);
-      btn.disabled = false;
-      btn.innerText = 'Delete Image';
-    }
-  } catch (err) {
-    console.error('Error deleting image:', err);
-  }
-}
+const AppState = {
+  isLoading: false,
+  images: [],
+  setState(updates) {
+    Object.assign(this, updates);
+  },
+};
 ```
+
+### Image Display Fix
+
+Originally, the MongoDB `filename` field (a UUID) was displayed under each image. This was removed — the gallery now shows only the image thumbnail, storage badge, and delete button. This keeps the UI clean and professional.
 
 ---
 
-> **Implementation Detail:** "When generating the `public/app.js` file, use the provided `loadImages` and `deleteImage` logic. Ensure the gallery uses a CSS Grid layout with `grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))` to maintain a professional, responsive interface. Use semantic HTML tags for the image cards and implement a 'danger' style for the delete action."
+## File Summary
 
-## This structure keeps the code clean and manageable as it moves toward a more professional setup
+| File | Status | Description |
+|---|---|---|
+| `public/index.html` | ✅ | Clean semantic HTML, links to external CSS/JS |
+| `public/styles.css` | ✅ | CSS variables, grid layout, card design, badges |
+| `public/app.js` | ✅ | AppState, fetch-based upload/delete, validation |
+| `src/app.js` | ✅ | Serves public folder + static uploads |
+| `src/controllers/imageController.js` | ✅ | Added `serveImage` proxy endpoint |
+| `src/routes/imageRoutes.js` | ✅ | Added `GET /images/:id/src` route |
+| `src/models/Image.js` | ✅ | Added `localPath` field for local file deletion |
+| `src/services/imageService.js` | ✅ | Fixed local file deletion using `localPath` |
 
-### Key Technical Consideration
+---
 
-Since the backend currently removes files from either Cloudinary or local storage before deleting the database record, the frontend needs to be resilient. If the `DELETE` request returns a **404**, the frontend should still remove the card from the UI to stay in sync with the server state.
+## Commands
+
+```bash
+npm start        # Start server on port 3001
+npm run lint     # Run ESLint
+npm run format   # Format code with Prettier
+```
+
+Frontend available at: <http://localhost:3001>

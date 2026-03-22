@@ -5,6 +5,7 @@ const imageSchema = new mongoose.Schema(
     filename: { type: String, required: true },
     path: { type: String, required: true },
     publicId: { type: String },
+    localPath: { type: String },
     uploadDate: { type: Date, default: Date.now },
     user_ip: { type: String, required: true },
   },
