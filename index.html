@@ -1,19 +1,118 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
+  <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Image Upload</title>
-</head>
-
-<body>
+    <style>
+      * { box-sizing: border-box; font-family: sans-serif; }
+      body { max-width: 600px; margin: 40px auto; padding: 0 20px; }
+      h1 { margin-bottom: 24px; }
+      .upload-box { border: 2px dashed #ccc; padding: 24px; text-align: center; border-radius: 8px; margin-bottom: 16px; }
+      .upload-box input[type="file"] { margin-bottom: 12px; }
+      .upload-box button { background: #007bff; color: white; border: none; padding: 8px 24px; border-radius: 4px; cursor: pointer; }
+      .upload-box button:hover { background: #0056b3; }
+      .upload-box button:disabled { background: #ccc; cursor: not-allowed; }
+      #message { margin: 16px 0; padding: 12px; border-radius: 4px; display: none; }
+      #message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+      #message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+      .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 24px; }
+      .gallery h2 { grid-column: 1 / -1; margin-bottom: 8px; }
+      .gallery img { width: 100%; height: 150px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; }
+      .gallery .name { font-size: 12px; margin-top: 4px; color: #666; word-break: break-all; }
+    </style>
+  </head>
+  <body>
     <h1>Upload an Image</h1>
-    <form id="uploadForm" action="http://localhost:3001/uploadImage" method="post" enctype="multipart/form-data">
-        <label for="image">Select an image:</label>
-        <input type="file" id="image" name="image" accept="image/*" required />
-        <button type="submit">Upload</button>
-    </form>
-</body>
 
+    <div id="message"></div>
+
+    <div class="upload-box">
+      <form id="uploadForm">
+        <input type="file" id="image" name="image" accept="image/*" required />
+        <br />
+        <button type="submit" id="submitBtn">Upload</button>
+      </form>
+    </div>
+
+    <div class="gallery">
+      <h2>Uploaded Images</h2>
+      <div id="imageList"></div>
+    </div>
+
+    <script>
+      const API = 'http://localhost:3001';
+
+      const form = document.getElementById('uploadForm');
+      const message = document.getElementById('message');
+      const submitBtn = document.getElementById('submitBtn');
+
+      function showMessage(text, type) {
+        message.textContent = text;
+        message.className = type;
+        message.style.display = 'block';
+        setTimeout(() => { message.style.display = 'none'; }, 5000);
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const fileInput = document.getElementById('image');
+        if (!fileInput.files[0]) {
+          showMessage('Please select a file first.', 'error');
+          return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Uploading...';
+
+        const formData = new FormData();
+        formData.append('image', fileInput.files[0]);
+
+        try {
+          const res = await fetch(`${API}/uploadImage`, { method: 'POST', body: formData });
+          const data = await res.json();
+
+          if (data.success) {
+            showMessage('Image uploaded successfully!', 'success');
+            form.reset();
+            loadImages();
+          } else {
+            showMessage(data.error || 'Upload failed.', 'error');
+          }
+        } catch (err) {
+          showMessage('Network error. Is the server running?', 'error');
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Upload';
+        }
+      });
+
+      async function loadImages() {
+        try {
+          const res = await fetch(`${API}/images`);
+          const data = await res.json();
+          const list = document.getElementById('imageList');
+          list.innerHTML = '';
+
+          if (!data.data || data.data.length === 0) {
+            list.innerHTML = '<p style="color:#666">No images uploaded yet.</p>';
+            return;
+          }
+
+          data.data.forEach((img) => {
+            const div = document.createElement('div');
+            div.innerHTML = `
+              <img src="${img.path}" alt="${img.filename}" loading="lazy" />
+              <div class="name">${img.filename}</div>
+            `;
+            list.appendChild(div);
+          });
+        } catch (err) {
+          console.error('Failed to load images:', err);
+        }
+      }
+
+      loadImages();
+    </script>
+  </body>
 </html>

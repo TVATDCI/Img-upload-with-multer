@@ -1,68 +1,213 @@
-# Uploading Images with multer
+# Image Upload API
 
-Here, you will be able to create a server that will handle image uploads, and also keep track of the files in a database.
+A production-ready Express.js image upload API with MongoDB storage and Cloudinary cloud storage.
 
-## Tasks
+## Tech Stack
 
-First use the `.env.example` file to set up your `.env` file.
+- **Express.js** — Web framework
+- **Multer** — File upload middleware
+- **Mongoose** — MongoDB ODM
+- **Cloudinary** — Cloud image storage (with local fallback)
+- **Helmet** — Security headers
+- **express-rate-limit** — Upload rate limiting
+- **ESLint + Prettier** — Code linting and formatting
 
-After that, make sure the server starts up and connects to MongoDB successfully.
+## Project Structure
 
-A [frontend](./index.html) has been included for testing the backend. Don't edit the frontend. You can use Live Server to view the frontend.
+```
+src/
+├── config/
+│   ├── index.js           # Environment config (centralized)
+│   └── database.js        # MongoDB connection
+├── controllers/
+│   └── imageController.js # HTTP request/response handlers
+├── services/
+│   ├── imageService.js    # Business logic (DB + file operations)
+│   └── cloudinaryService.js # Cloudinary upload/delete
+├── models/
+│   └── Image.js           # Mongoose schema
+├── routes/
+│   ├── index.js            # Route aggregator
+│   └── imageRoutes.js      # API route definitions
+├── middlewares/
+│   ├── upload.js          # Multer configuration
+│   ├── errorHandler.js    # Global error handler
+│   └── multerError.js     # Multer error mapper
+└── utils/
+    ├── fileUtils.js       # File cleanup helpers
+    └── responseHelper.js  # Standardized API responses
+app.js                     # Express app setup
+server.js                  # Entry point
+```
 
-Using [multer](https://www.npmjs.com/package/multer), you will configure your server to be able to receive and save images from the frontend.
+## Setup
 
-🍩
+### 1. Install dependencies
 
-### Task 1
+```bash
+npm install
+```
 
-Install the following npm packages;
+### 2. Configure environment
 
-- express, mongoose, multer, cors
+Copy `.env.example` to `.env` and fill in your values:
 
-### Task 2
+```bash
+cp .env.example .env
+```
 
-Setup `multer` so that;
+| Variable | Description |
+|---|---|
+| `MONGO_URI` | MongoDB connection string (local or Atlas) |
+| `PORT` | Server port (default: 3001) |
+| `UPLOADS_FOLDER` | Local upload directory (default: `./uploads`) |
+| `ALLOWED_ORIGINS` | CORS allowed origins (comma-separated) |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name |
+| `CLOUDINARY_API_KEY` | Cloudinary API key |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret |
 
-1. The destination of all uploaded images will be in the server `/uploads` folder
-2. The file limit for each image is **200kb**
+### 3. Start the server
 
-### Task 3
+```bash
+npm start
+```
 
-- Create an endpoint with the path `/uploadImage`
-- Add the multer middleware to the `/uploadImage` endpoint
+## API Endpoints
 
-### Task 4
+### `POST /uploadImage`
 
-- Try uploading a few images (under 200kb in size) to see that the upload facility works
+Upload an image. Supports JPEG, PNG, GIF, WebP. Max size: **200KB**.
 
-### Task 5
+**Response:**
 
-Now that we know the upload feature works, let us work on the database;
+```json
+{
+  "success": true,
+  "message": "Image uploaded successfully!",
+  "data": {
+    "_id": "...",
+    "filename": "uuid-filename.jpg",
+    "path": "https://res.cloudinary.com/.../uuid-filename.jpg",
+    "publicId": "img-upload/uuid-filename",
+    "uploadDate": "2026-03-22T...",
+    "user_ip": "::1"
+  }
+}
+```
 
-1. Create a schema that can fit the following data structure:
+### `GET /images`
 
-   ```JSON
-   {
-     "filename": "guybrush.png",
-     "path": "uploads/guybrush.png",
-     "uploadDate": 1651755919488,
-     "user_ip": "216.58.213.227"
-   }
-   ```
+List all uploaded images, sorted newest first.
 
-2. Create and export an `Image` model for your schema
+**Response:**
 
-### Task 6
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "_id": "...",
+      "filename": "uuid-filename.jpg",
+      "path": "https://res.cloudinary.com/.../uuid-filename.jpg",
+      "publicId": "img-upload/uuid-filename",
+      "uploadDate": "2026-03-22T...",
+      "user_ip": "::1"
+    }
+  ]
+}
+```
 
-Update the endpoint you created in Task 3;
+### `GET /images/:id`
 
-- For every image uploaded, use the `Image` model to add the following information into the database;
-  - filename
-  - path
-  - uploadDate
-  - user_ip
+Get a single image by ID.
 
-- Read the API documentation for [multer](https://www.npmjs.com/package/multer) to find out how to get the `filename` and `path` values
+**Response:**
 
-> For `user_ip`, you can use the Express [req.ip](https://expressjs.com/en/api.html#req.ip) property
+```json
+{
+  "success": true,
+  "data": {
+    "_id": "...",
+    "filename": "uuid-filename.jpg",
+    "path": "https://res.cloudinary.com/...",
+    "publicId": "img-upload/uuid-filename",
+    "uploadDate": "2026-03-22T...",
+    "user_ip": "::1"
+  }
+}
+```
+
+### `DELETE /images/:id`
+
+Delete an image. Removes from Cloudinary (if uploaded) or local disk, then from MongoDB.
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Image deleted successfully!",
+  "data": null
+}
+```
+
+## Error Responses
+
+All errors return a consistent format:
+
+```json
+{
+  "success": false,
+  "error": "Error description"
+}
+```
+
+| HTTP Status | Meaning |
+|---|---|
+| 400 | Bad request (no file, invalid ID) |
+| 413 | File too large (max 200KB) |
+| 415 | Invalid file type |
+| 404 | Image not found |
+| 429 | Too many uploads (rate limited) |
+| 500 | Server error |
+
+## Features
+
+### Storage
+
+- **Cloudinary** — Primary storage. Images are uploaded to Cloudinary and served via CDN.
+- **Local fallback** — If Cloudinary upload fails, the image is stored locally in `./uploads/`.
+
+### Security
+
+- MIME type validation (image/jpeg, image/png, image/gif, image/webp only)
+- File size limit: 200KB
+- Filename sanitization with UUID
+- Rate limiting: 20 uploads per 15 minutes per IP
+- Helmet security headers
+- CORS whitelist (configurable via `ALLOWED_ORIGINS`)
+
+### Error Handling
+
+- Multer errors mapped to appropriate HTTP status codes
+- Global error handler for consistent JSON responses
+- Orphaned file cleanup if database save fails
+
+## Development
+
+```bash
+npm start        # Start server
+npm run lint     # Run ESLint
+npm run format   # Format code with Prettier
+```
+
+## Original Student Tasks
+
+This project started as a student exercise. The tasks below were the learning objectives:
+
+1. Install npm packages: express, mongoose, multer, cors
+2. Configure Multer with `./uploads` destination and 200KB file limit
+3. Create a `/uploadImage` endpoint with Multer middleware
+4. Test basic image upload
+5. Create an Image schema with filename, path, uploadDate, user_ip
+6. Save image metadata to MongoDB on upload
