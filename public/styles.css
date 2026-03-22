@@ -161,14 +161,6 @@ h1 {
   gap: 8px;
 }
 
-.image-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: #374151;
-  word-break: break-all;
-  margin: 0;
-}
-
 .image-meta {
   display: flex;
   align-items: center;
