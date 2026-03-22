@@ -6,6 +6,7 @@ import {
   getImages,
   getImageById,
   deleteImage,
+  serveImage,
 } from '../controllers/imageController.js';
 
 const router = express.Router();
@@ -21,6 +22,7 @@ const uploadLimiter = rateLimit({
 router.post('/uploadImage', uploadLimiter, uploadImage, handleUpload);
 router.get('/images', getImages);
 router.get('/images/:id', getImageById);
+router.get('/images/:id/src', serveImage);
 router.delete('/images/:id', deleteImage);
 
 export default router;

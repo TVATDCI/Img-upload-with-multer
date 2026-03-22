@@ -58,7 +58,7 @@ function renderGallery(images) {
     card.className = 'image-card';
     card.id = `img-${img._id}`;
     card.innerHTML = `
-      <img src="${img.path}" alt="${img.filename}" />
+      <img src="/images/${img._id}/src" alt="${img.filename}" />
       <div class="card-details">
         <div>
           <p class="image-name">${img.filename}</p>
