@@ -29,6 +29,16 @@
 - **Loading States**: Add a "Loading..." spinner or text while images are being fetched or uploaded.
 - **Empty State**: Display a "No images uploaded yet" message if the `GET /images` array is empty.
 - **Toast Notifications**: Refine the message display system to handle multiple types of alerts (Success, Error, Info) with distinct color coding.
+- **Client-Side Validation**: Implement an immediate check in `app.js` to verify file size is under **200KB** and matches allowed mimetypes (**JPEG, PNG, GIF, WebP**) before the upload starts.
+- **Accessibility (a11y)**: Add `aria-label` attributes to the "Delete" buttons and implement focus management so the user doesn't lose their place after an item is removed from the gallery.
+- **Storage Origin Indicators**: Add a small UI badge to each image card identifying if it is served via **Cloudinary** or **Local Fallback** based on the image `path`.
+
+Phase 5: Environment & Deployment Sync
+
+_Add this as a new section to ensure your backend and frontend communicate perfectly:_
+
+- **Path Normalization**: Use `path.join(__dirname, 'public')` in `app.js` to ensure the static folder is served correctly across different operating systems.
+- **CORS Alignment**: Double-check that `ALLOWED_ORIGINS` in the `.env` file matches the frontend's origin to prevent "Blocked by CORS" errors during testing.
 
 ---
 
@@ -41,6 +51,12 @@
 > **Prompt 3 (Delete Feature):** "Modify the gallery rendering logic in `app.js`. Each image card should now include a 'Delete' button. Create a function that handles the DELETE request to `/images/:id` and updates the UI by removing the deleted image's card from the DOM upon success."
 
 > **Prompt 4 (UX Refinement):** "Improve the feedback system. When an image is deleting, change the button text to 'Deleting...'. If the gallery is empty after a fetch, display a centered 'No images found' message in the gallery container."
+
+> **Final Polish Instruction:** "Before completing the refactor, perform a 'Clean Code' pass:
+>
+> 1. Replace all hardcoded colors in `styles.css` with CSS variables.
+> 2. Ensure every `async/await` block has a `try/catch` wrapper that triggers a user-facing notification.
+> 3. Add a 'Health Check' console log that fires only when the frontend successfully connects to the backend `/images` endpoint."
 
 This CSS Grid layout provides a responsive, professional "masonry-style" appearance that adapts to different screen sizes without needing complex media queries. It also includes the styling for the **Delete** button requested.
 
@@ -192,7 +208,7 @@ async function deleteImage(id) {
 
 > **Implementation Detail:** "When generating the `public/app.js` file, use the provided `loadImages` and `deleteImage` logic. Ensure the gallery uses a CSS Grid layout with `grid-template-columns: repeat(auto-fill, minmax(280px, 1fr))` to maintain a professional, responsive interface. Use semantic HTML tags for the image cards and implement a 'danger' style for the delete action."
 
-## This structure keeps the code clean and manageable as it moves toward a more professional setup.
+## This structure keeps the code clean and manageable as it moves toward a more professional setup
 
 ### Key Technical Consideration
 
