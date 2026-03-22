@@ -16,7 +16,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 app.use(helmet());
-const allowedOrigins = env.cors.origin.split(",").map((o) => o.trim());
+const allowedOrigins = env.cors.origin.split(',').map((o) => o.trim());
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json({ limit: '10kb' }));
 

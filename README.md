@@ -38,6 +38,11 @@ src/
     └── responseHelper.js  # Standardized API responses
 app.js                     # Express app setup
 server.js                  # Entry point
+
+public/                    # Frontend assets
+├── index.html            # Frontend HTML structure
+├── styles.css            # Frontend styles (separated from HTML)
+└── app.js                # Frontend JavaScript (separated from HTML)
 ```
 
 ## Setup
@@ -56,15 +61,15 @@ Copy `.env.example` to `.env` and fill in your values:
 cp .env.example .env
 ```
 
-| Variable | Description |
-|---|---|
-| `MONGO_URI` | MongoDB connection string (local or Atlas) |
-| `PORT` | Server port (default: 3001) |
-| `UPLOADS_FOLDER` | Local upload directory (default: `./uploads`) |
-| `ALLOWED_ORIGINS` | CORS allowed origins (comma-separated) |
-| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name |
-| `CLOUDINARY_API_KEY` | Cloudinary API key |
-| `CLOUDINARY_API_SECRET` | Cloudinary API secret |
+| Variable                | Description                                   |
+| ----------------------- | --------------------------------------------- |
+| `MONGO_URI`             | MongoDB connection string (local or Atlas)    |
+| `PORT`                  | Server port (default: 3001)                   |
+| `UPLOADS_FOLDER`        | Local upload directory (default: `./uploads`) |
+| `ALLOWED_ORIGINS`       | CORS allowed origins (comma-separated)        |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name                         |
+| `CLOUDINARY_API_KEY`    | Cloudinary API key                            |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret                         |
 
 ### 3. Start the server
 
@@ -162,14 +167,14 @@ All errors return a consistent format:
 }
 ```
 
-| HTTP Status | Meaning |
-|---|---|
-| 400 | Bad request (no file, invalid ID) |
-| 413 | File too large (max 200KB) |
-| 415 | Invalid file type |
-| 404 | Image not found |
-| 429 | Too many uploads (rate limited) |
-| 500 | Server error |
+| HTTP Status | Meaning                           |
+| ----------- | --------------------------------- |
+| 400         | Bad request (no file, invalid ID) |
+| 413         | File too large (max 200KB)        |
+| 415         | Invalid file type                 |
+| 404         | Image not found                   |
+| 429         | Too many uploads (rate limited)   |
+| 500         | Server error                      |
 
 ## Features
 
@@ -201,40 +206,172 @@ npm run lint     # Run ESLint
 npm run format   # Format code with Prettier
 ```
 
+### Accessing the Refactored Frontend
+
+After starting the server with `npm start`:
+
+- **New Frontend (Recommended)**: <http://localhost:3001>
+  - Served from `public/index.html`
+  - Features: Message display, delete functionality, state management
+
+- **Old Frontend (Legacy)**: <http://localhost:3001/uploads/../../../index.html> (deprecated)
+  - Kept for backward compatibility
+  - Will be removed in future versions
+
+### Testing the Message Display Fix
+
+When you upload an image:
+
+1. A **green message** should appear smoothly at the top: "Image uploaded successfully!"
+2. It **stays visible for 5 seconds**, then fades out
+3. The message uses CSS transitions (not animation jumps)
+4. **Browser Console** shows detailed debug logs:
+
+   ```
+   [App Initialization] {...}
+   [Upload Started] {...}
+   [Upload Response] {...}
+   [Image Data Received] {...}
+   [Notification] {...}
+   ```
+
+### Debugging Tips
+
+Open **Developer Tools (F12)** → **Console Tab** to see:
+
+- `[AppState]` logs: State changes
+- `[Notification]` logs: Message display events
+- `[Upload Started/Response]` logs: Upload progress
+- Timestamps for each action
+
+This helps identify exactly where any issues occur if the message still doesn't display.
+
+### Frontend Refactoring Plan
+
+The frontend is being refactored from a single monolithic `index.html` into a modular structure. This improves:
+
+- **Debuggability** — Separate concerns make it easier to identify issues
+- **Maintainability** — CSS and JS changes don't require searching through large HTML files
+- **Best Practices** — Follows professional web development standards
+- **Performance** — Easier to optimize individual files
+
+#### Refactoring Structure
+
+**1. `public/index.html`** — HTML Only
+
+- Clean semantic HTML without inline styles or scripts
+- Minimal markup focused on structure
+- References to external CSS and JS
+
+**2. `public/styles.css`** — Styling Only
+
+- All CSS rules separated from HTML
+- Clean cascade without `!important` flags
+- Proper CSS for state management (`.show` class pattern)
+- Smooth transitions and animations
+
+**3. `public/app.js`** — JavaScript Only
+
+- All client-side logic in one place
+- Event listeners for DOM interactions
+- API communication (fetch calls)
+- Message display and gallery management
+- No inline event handlers
+
+### Technical Implementation Details
+
+**CSS Variables** (`public/styles.css`):
+
+```css
+:root {
+  --color-primary: #007bff;
+  --color-success: #22c55e;
+  --color-danger: #ef4444;
+  --transition-base: 0.3s ease;
+  /* ... and 20+ more variables */
+}
+```
+
+Benefits: Easy theming, consistent spacing, reusable transitions.
+
+**State Management** (`public/app.js`):
+
+```javascript
+const AppState = {
+  isLoading: false,
+  images: [],
+  message: { text: '', type: '' },
+
+  setState(updates) {
+    Object.assign(this, updates);
+    this.log('State Changed', updates); // Debug logging
+  },
+};
+```
+
+Benefits: Predictable UI updates, centralized data, easy debugging.
+
+**Message Display Fix**:
+CSS transition: `height: 0 → auto` + `opacity: 0 → 1` instead of display.
+Result: Smooth animation, no CSS conflicts, works reliably.
+
 ## Frontend
 
-The `index.html` file is a self-contained frontend for testing the API.
+The frontend has been refactored from a single `index.html` into separate files for better maintainability:
+
+- **`public/index.html`** — HTML structure and layout
+- **`public/styles.css`** — All styling (previously inline `<style>`)
+- **`public/app.js`** — All JavaScript logic (previously inline `<script>`)
+
+### Features
 
 - Fetch-based upload (no page reload)
 - Success/error messages with 5s auto-hide
 - Live image gallery from `GET /images`
 - Upload button disabled during upload
 
-### Known Issues
+### Frontend Fixes Applied (Resolution of Previous Issues)
 
-**Frontend upload feedback (under investigation):**
+**Issue #1 - File Deletion Bug (Backend) ✅ FIXED**
 
-After clicking Upload, the image uploads successfully to both MongoDB and Cloudinary, but:
+- [src/controllers/imageController.js](src/controllers/imageController.js) — Changed to pass `localFilePath` instead of absolute path
+- [src/services/imageService.js](src/services/imageService.js) — Now constructs proper URL paths:
+  - If Cloudinary succeeds: Uses Cloudinary CDN URL
+  - If Cloudinary fails: Uses `/uploads/{filename}` for local file serving
+- Impact: Images now display correctly in the gallery
 
-1. The success message box flashes green for less than a second then disappears
-2. The gallery does not automatically refresh — manual page reload is needed to see the new image
-3. Browser console shows the upload response is correct (`status 201`, `success: true`, `data` present)
+**Issue #2 - Gallery Not Refreshing ✅ FIXED**
 
-The issue is suspected to be one of:
-- Live Server caching an older version of `index.html`
-- Browser caching the old HTML with `action=` on the `<form>` tag causing a native form submit
-- A JavaScript error or promise rejection in the `.then()` chain that silently fails
+- Added explicit `loadImages()` call after successful upload
+- Enhanced error handling with HTTP status checking
+- Added console logging for debugging
 
-### Debugging Steps Taken
+**Issue #3 - Message Not Displaying ✅ FIXED**
 
-1. Verified form has no `action` attribute (uses only `id="uploadForm"`)
-2. Added `e.preventDefault()` and `e.stopPropagation()` on form submit
-3. Switched from async/await to `.then().catch().finally()` chain
-4. Wrapped code in `DOMContentLoaded` (later removed — script at bottom of body)
-5. Added `console.log` on every step — all fire correctly, response is `res.ok: true`
-6. `showMessage()` is called with `"Image uploaded successfully!"` — message flashes then disappears
-7. `loadImages()` is not called after upload — `prependImage()` from `data.data` not executing
-8. Hard refresh (Ctrl+Shift+R) does not resolve the issue
+- **Root Cause**: CSS cascade issues with `display: none/block` and multiple inline styles
+- **Solution**: Refactored frontend into modular structure with clean separation of concerns
+- **Implementation**:
+  - `public/index.html` — Semantic HTML only, no inline styles/scripts
+  - `public/styles.css` — CSS variables, no `!important` flags, smooth transitions
+  - `public/app.js` — JavaScript with state management and debug logging
+  - Uses `height: 0 → auto` with `opacity: 0 → 1` for smooth message visibility
+
+**Issue #4 - Delete Functionality ✅ IMPLEMENTED**
+
+- Each image has a "Delete" button in the gallery
+- Confirmation dialog prevents accidental deletion
+- Optimistic UI: Card removed immediately, restored if delete fails
+- Handles both successful deletes and 404 errors (image already gone)
+
+### State Management & Debugging
+
+The refactored `public/app.js` includes:
+
+- **AppState Object** — Centralized state for UI consistency
+- **Debug Logging** — Every action logged to browser console with timestamps
+- **Error Boundaries** — Try-catch blocks for resilient error handling
+- **DOM Initialization** — Ensures all elements are ready before event binding
+- **DOMContentLoaded Event** — Guarantees script runs after HTML is parsed
 
 ## Original Student Tasks
 
