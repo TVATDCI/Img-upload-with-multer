@@ -53,6 +53,7 @@ function renderGallery(images) {
   }
 
   images.forEach((img) => {
+    console.log('[renderGallery] Rendering image:', { _id: img._id, filename: img.filename, path: img.path });
     const card = document.createElement('div');
     card.className = 'image-card';
     card.id = `img-${img._id}`;
@@ -152,8 +153,10 @@ form.addEventListener('submit', (e) => {
     signal: uploadAbortController.signal,
   })
     .then((res) => res.json())
-    .then((data) => {
+      .then((data) => {
       console.log('[Upload Response]', data);
+      console.log('[Upload Response] data.data.path:', data.data?.path);
+      console.log('[Upload Response] data.data.publicId:', data.data?.publicId);
 
       if (data.success) {
         showMessage('Image uploaded successfully!', 'success');
