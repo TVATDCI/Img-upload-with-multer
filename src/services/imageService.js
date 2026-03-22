@@ -3,12 +3,11 @@ import { uploadToCloudinary, deleteFromCloudinary } from './cloudinaryService.js
 import { deleteFile } from '../utils/fileUtils.js';
 
 export const createImage = async ({ filename, path, user_ip }) => {
-  let cloudUrl = null;
   let publicId = null;
 
   try {
     const result = await uploadToCloudinary(path);
-    cloudUrl = result.secure_url;
+    path = result.secure_url;
     publicId = result.public_id;
     deleteFile(path);
   } catch (err) {
@@ -17,8 +16,7 @@ export const createImage = async ({ filename, path, user_ip }) => {
 
   const image = new Image({
     filename,
-    path: cloudUrl || path,
-    cloudUrl,
+    path,
     publicId,
     uploadDate: new Date(),
     user_ip,
@@ -47,7 +45,7 @@ export const deleteImage = async (id) => {
     }
   }
 
-  if (!image.cloudUrl) {
+  if (!image.publicId) {
     deleteFile(image.path);
   }
 
