@@ -1,13 +1,13 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
 import { env } from "./config/index.js";
 import { connectDB } from "./config/database.js";
 import routes from "./routes/index.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
-import path from "path";
-import { fileURLToPath } from "url";
-import fs from "fs";
-import multer from "multer";
+import { multerErrorHandler } from "./middlewares/multerError.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,7 +24,7 @@ if (!fs.existsSync(uploadDir)) {
 app.use("/uploads", express.static(uploadDir));
 
 app.use(routes);
-
+app.use(multerErrorHandler);
 app.use(errorHandler);
 
 await connectDB();
