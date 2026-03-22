@@ -67,7 +67,7 @@ const upload = multer({
 app.use("/uploads", express.static(uploadDir));
 
 // Import the Image model
-import Image from "./models/imageModel.js";
+import Image from "./models/imagesModel.js";
 
 // Handle file upload endpoint
 app.post("/uploadImage", upload.single("image"), async (req, res) => {
