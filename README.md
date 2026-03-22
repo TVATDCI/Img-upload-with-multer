@@ -206,6 +206,46 @@ npm run lint     # Run ESLint
 npm run format   # Format code with Prettier
 ```
 
+### Accessing the Refactored Frontend
+
+After starting the server with `npm start`:
+
+- **New Frontend (Recommended)**: <http://localhost:3001>
+  - Served from `public/index.html`
+  - Features: Message display, delete functionality, state management
+
+- **Old Frontend (Legacy)**: <http://localhost:3001/uploads/../../../index.html> (deprecated)
+  - Kept for backward compatibility
+  - Will be removed in future versions
+
+### Testing the Message Display Fix
+
+When you upload an image:
+
+1. A **green message** should appear smoothly at the top: "Image uploaded successfully!"
+2. It **stays visible for 5 seconds**, then fades out
+3. The message uses CSS transitions (not animation jumps)
+4. **Browser Console** shows detailed debug logs:
+
+   ```
+   [App Initialization] {...}
+   [Upload Started] {...}
+   [Upload Response] {...}
+   [Image Data Received] {...}
+   [Notification] {...}
+   ```
+
+### Debugging Tips
+
+Open **Developer Tools (F12)** → **Console Tab** to see:
+
+- `[AppState]` logs: State changes
+- `[Notification]` logs: Message display events
+- `[Upload Started/Response]` logs: Upload progress
+- Timestamps for each action
+
+This helps identify exactly where any issues occur if the message still doesn't display.
+
 ### Frontend Refactoring Plan
 
 The frontend is being refactored from a single monolithic `index.html` into a modular structure. This improves:
@@ -238,6 +278,43 @@ The frontend is being refactored from a single monolithic `index.html` into a mo
 - Message display and gallery management
 - No inline event handlers
 
+### Technical Implementation Details
+
+**CSS Variables** (`public/styles.css`):
+
+```css
+:root {
+  --color-primary: #007bff;
+  --color-success: #22c55e;
+  --color-danger: #ef4444;
+  --transition-base: 0.3s ease;
+  /* ... and 20+ more variables */
+}
+```
+
+Benefits: Easy theming, consistent spacing, reusable transitions.
+
+**State Management** (`public/app.js`):
+
+```javascript
+const AppState = {
+  isLoading: false,
+  images: [],
+  message: { text: '', type: '' },
+
+  setState(updates) {
+    Object.assign(this, updates);
+    this.log('State Changed', updates); // Debug logging
+  },
+};
+```
+
+Benefits: Predictable UI updates, centralized data, easy debugging.
+
+**Message Display Fix**:
+CSS transition: `height: 0 → auto` + `opacity: 0 → 1` instead of display.
+Result: Smooth animation, no CSS conflicts, works reliably.
+
 ## Frontend
 
 The frontend has been refactored from a single `index.html` into separate files for better maintainability:
@@ -269,12 +346,32 @@ The frontend has been refactored from a single `index.html` into separate files 
 - Enhanced error handling with HTTP status checking
 - Added console logging for debugging
 
-**Issue #3 - Message Not Displaying ✅ IN PROGRESS (Refactoring)**
+**Issue #3 - Message Not Displaying ✅ FIXED**
 
-- Separated CSS and JavaScript into dedicated files to improve debuggability
-- Using clean CSS approach: `height: 0 → auto` with `opacity: 0 → 1` transition
-- Removed all `!important` flags and inline styles
-- New structure will make message display issues easier to diagnose
+- **Root Cause**: CSS cascade issues with `display: none/block` and multiple inline styles
+- **Solution**: Refactored frontend into modular structure with clean separation of concerns
+- **Implementation**:
+  - `public/index.html` — Semantic HTML only, no inline styles/scripts
+  - `public/styles.css` — CSS variables, no `!important` flags, smooth transitions
+  - `public/app.js` — JavaScript with state management and debug logging
+  - Uses `height: 0 → auto` with `opacity: 0 → 1` for smooth message visibility
+
+**Issue #4 - Delete Functionality ✅ IMPLEMENTED**
+
+- Each image has a "Delete" button in the gallery
+- Confirmation dialog prevents accidental deletion
+- Optimistic UI: Card removed immediately, restored if delete fails
+- Handles both successful deletes and 404 errors (image already gone)
+
+### State Management & Debugging
+
+The refactored `public/app.js` includes:
+
+- **AppState Object** — Centralized state for UI consistency
+- **Debug Logging** — Every action logged to browser console with timestamps
+- **Error Boundaries** — Try-catch blocks for resilient error handling
+- **DOM Initialization** — Ensures all elements are ready before event binding
+- **DOMContentLoaded Event** — Guarantees script runs after HTML is parsed
 
 ## Original Student Tasks
 
