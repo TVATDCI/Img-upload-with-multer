@@ -1,5 +1,5 @@
-import { v2 as cloudinary } from "cloudinary";
-import { env } from "../config/index.js";
+import { v2 as cloudinary } from 'cloudinary';
+import { env } from '../config/index.js';
 
 cloudinary.config({
   cloud_name: env.cloudinary.cloudName,
@@ -9,8 +9,8 @@ cloudinary.config({
 
 export const uploadToCloudinary = (filePath) => {
   return cloudinary.uploader.upload(filePath, {
-    folder: "img-upload",
-    resource_type: "auto",
+    folder: 'img-upload',
+    resource_type: 'auto',
   });
 };
 

@@ -1,6 +1,12 @@
-import express from "express";
-import rateLimit from "express-rate-limit";
-import { uploadImage, handleUpload, getImages, getImageById, deleteImage } from "../controllers/imageController.js";
+import express from 'express';
+import rateLimit from 'express-rate-limit';
+import {
+  uploadImage,
+  handleUpload,
+  getImages,
+  getImageById,
+  deleteImage,
+} from '../controllers/imageController.js';
 
 const router = express.Router();
 
@@ -9,12 +15,12 @@ const uploadLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: "Too many uploads. Please try again later." },
+  message: { success: false, error: 'Too many uploads. Please try again later.' },
 });
 
-router.post("/uploadImage", uploadLimiter, uploadImage, handleUpload);
-router.get("/images", getImages);
-router.get("/images/:id", getImageById);
-router.delete("/images/:id", deleteImage);
+router.post('/uploadImage', uploadLimiter, uploadImage, handleUpload);
+router.get('/images', getImages);
+router.get('/images/:id', getImageById);
+router.delete('/images/:id', deleteImage);
 
 export default router;

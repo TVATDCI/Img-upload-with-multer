@@ -1,5 +1,5 @@
-import express from "express";
-import imageRoutes from "./imageRoutes.js";
+import express from 'express';
+import imageRoutes from './imageRoutes.js';
 
 const router = express.Router();
 
