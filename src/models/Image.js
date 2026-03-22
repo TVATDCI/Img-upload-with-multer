@@ -4,6 +4,8 @@ const imageSchema = new mongoose.Schema(
   {
     filename: { type: String, required: true },
     path: { type: String, required: true },
+    cloudUrl: { type: String },
+    publicId: { type: String },
     uploadDate: { type: Date, default: Date.now },
     user_ip: { type: String, required: true },
   },

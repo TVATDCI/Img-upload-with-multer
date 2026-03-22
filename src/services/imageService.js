@@ -1,10 +1,25 @@
 import Image from "../models/Image.js";
+import { uploadToCloudinary, deleteFromCloudinary } from "./cloudinaryService.js";
 import { deleteFile } from "../utils/fileUtils.js";
 
 export const createImage = async ({ filename, path, user_ip }) => {
+  let cloudUrl = null;
+  let publicId = null;
+
+  try {
+    const result = await uploadToCloudinary(path);
+    cloudUrl = result.secure_url;
+    publicId = result.public_id;
+    deleteFile(path);
+  } catch (err) {
+    console.warn("Cloudinary upload failed, keeping local file:", err.message);
+  }
+
   const image = new Image({
     filename,
-    path,
+    path: cloudUrl || path,
+    cloudUrl,
+    publicId,
     uploadDate: new Date(),
     user_ip,
   });
@@ -23,7 +38,19 @@ export const getImageById = async (id) => {
 export const deleteImage = async (id) => {
   const image = await Image.findById(id);
   if (!image) return null;
-  deleteFile(image.path);
+
+  if (image.publicId) {
+    try {
+      await deleteFromCloudinary(image.publicId);
+    } catch (err) {
+      console.warn("Cloudinary delete failed:", err.message);
+    }
+  }
+
+  if (!image.cloudUrl) {
+    deleteFile(image.path);
+  }
+
   await Image.findByIdAndDelete(id);
   return image;
 };
