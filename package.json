@@ -14,10 +14,6 @@
   "author": "",
   "license": "ISC",
   "type": "module",
-  "scripts": {
-    "start": "node sever.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
   "homepage": "https://github.com/TVATDCI/Img-upload-with-multer#readme",
   "dependencies": {
     "cors": "^2.8.6",
