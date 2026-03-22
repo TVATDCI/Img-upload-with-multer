@@ -4,22 +4,22 @@ import { deleteFile } from '../utils/fileUtils.js';
 
 export const createImage = async ({ filename, localFilePath, user_ip }) => {
   let publicId = null;
-  let path = `/uploads/${filename}`; // Default to local file URL
+  let path = `/uploads/${filename}`;
 
   try {
     const result = await uploadToCloudinary(localFilePath);
     path = result.secure_url;
     publicId = result.public_id;
-    deleteFile(localFilePath); // Delete the LOCAL file after successful Cloudinary upload
+    deleteFile(localFilePath);
   } catch (err) {
     console.warn('Cloudinary upload failed, keeping local file:', err.message);
-    // path remains as `/uploads/${filename}` for frontend access
   }
 
   const image = new Image({
     filename,
     path,
     publicId,
+    localPath: publicId ? null : localFilePath,
     uploadDate: new Date(),
     user_ip,
   });
@@ -47,8 +47,8 @@ export const deleteImage = async (id) => {
     }
   }
 
-  if (!image.publicId) {
-    deleteFile(image.path);
+  if (image.localPath) {
+    deleteFile(image.localPath);
   }
 
   await Image.findByIdAndDelete(id);
