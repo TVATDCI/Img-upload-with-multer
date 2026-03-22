@@ -201,6 +201,41 @@ npm run lint     # Run ESLint
 npm run format   # Format code with Prettier
 ```
 
+## Frontend
+
+The `index.html` file is a self-contained frontend for testing the API.
+
+- Fetch-based upload (no page reload)
+- Success/error messages with 5s auto-hide
+- Live image gallery from `GET /images`
+- Upload button disabled during upload
+
+### Known Issues
+
+**Frontend upload feedback (under investigation):**
+
+After clicking Upload, the image uploads successfully to both MongoDB and Cloudinary, but:
+
+1. The success message box flashes green for less than a second then disappears
+2. The gallery does not automatically refresh — manual page reload is needed to see the new image
+3. Browser console shows the upload response is correct (`status 201`, `success: true`, `data` present)
+
+The issue is suspected to be one of:
+- Live Server caching an older version of `index.html`
+- Browser caching the old HTML with `action=` on the `<form>` tag causing a native form submit
+- A JavaScript error or promise rejection in the `.then()` chain that silently fails
+
+### Debugging Steps Taken
+
+1. Verified form has no `action` attribute (uses only `id="uploadForm"`)
+2. Added `e.preventDefault()` and `e.stopPropagation()` on form submit
+3. Switched from async/await to `.then().catch().finally()` chain
+4. Wrapped code in `DOMContentLoaded` (later removed — script at bottom of body)
+5. Added `console.log` on every step — all fire correctly, response is `res.ok: true`
+6. `showMessage()` is called with `"Image uploaded successfully!"` — message flashes then disappears
+7. `loadImages()` is not called after upload — `prependImage()` from `data.data` not executing
+8. Hard refresh (Ctrl+Shift+R) does not resolve the issue
+
 ## Original Student Tasks
 
 This project started as a student exercise. The tasks below were the learning objectives:
