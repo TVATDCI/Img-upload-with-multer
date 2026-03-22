@@ -1,0 +1,7 @@
+.idea
+.env
+client/build/
+uploads/
+
+# Ignore node_modules
+**/node_modules
