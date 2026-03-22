@@ -70,7 +70,8 @@ function renderGallery(images) {
 
 async function loadImages() {
   AppState.setState({ isLoading: true });
-  imageGallery.innerHTML = '<p class="loading-state"><span class="spinner"></span><br />Loading images...</p>';
+  imageGallery.innerHTML =
+    '<p class="loading-state"><span class="spinner"></span><br />Loading images...</p>';
 
   try {
     const res = await fetch(`${API}images`);
@@ -81,7 +82,8 @@ async function loadImages() {
     AppState.setState({ images: data.data || [] });
     renderGallery(AppState.images);
   } catch (err) {
-    imageGallery.innerHTML = '<p class="empty-state">Failed to load images. Is the server running?</p>';
+    imageGallery.innerHTML =
+      '<p class="empty-state">Failed to load images. Is the server running?</p>';
   } finally {
     AppState.setState({ isLoading: false });
   }
