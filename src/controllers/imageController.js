@@ -13,7 +13,7 @@ export const handleUpload = async (req, res, next) => {
 
     const image = await imageService.createImage({
       filename: req.file.filename,
-      path: req.file.path,
+      localFilePath: req.file.path,
       user_ip: req.ip,
     });
 

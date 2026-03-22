@@ -2,16 +2,18 @@ import Image from '../models/Image.js';
 import { uploadToCloudinary, deleteFromCloudinary } from './cloudinaryService.js';
 import { deleteFile } from '../utils/fileUtils.js';
 
-export const createImage = async ({ filename, path, user_ip }) => {
+export const createImage = async ({ filename, localFilePath, user_ip }) => {
   let publicId = null;
+  let path = `/uploads/${filename}`; // Default to local file URL
 
   try {
-    const result = await uploadToCloudinary(path);
+    const result = await uploadToCloudinary(localFilePath);
     path = result.secure_url;
     publicId = result.public_id;
-    deleteFile(path);
+    deleteFile(localFilePath); // Delete the LOCAL file after successful Cloudinary upload
   } catch (err) {
     console.warn('Cloudinary upload failed, keeping local file:', err.message);
+    // path remains as `/uploads/${filename}` for frontend access
   }
 
   const image = new Image({
