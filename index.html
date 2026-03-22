@@ -50,19 +50,21 @@
       }
       #message {
         margin: 16px 0;
-        padding: 12px;
-        border-radius: 4px;
+        padding: 14px 16px;
+        border-radius: 6px;
         display: none;
+        font-weight: 500;
+        min-height: 46px;
       }
       #message.success {
-        background: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
+        background: #22c55e;
+        color: white;
+        border: 1px solid #16a34a;
       }
       #message.error {
-        background: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
+        background: #ef4444;
+        color: white;
+        border: 1px solid #dc2626;
       }
       .gallery {
         display: grid;
@@ -108,95 +110,119 @@
     </div>
 
     <script>
-      const API = "http://localhost:3001";
-      const fileInput = document.getElementById("image");
-      const fileName = document.getElementById("fileName");
-      const form = document.getElementById("uploadForm");
-      const message = document.getElementById("message");
-      const submitBtn = document.getElementById("submitBtn");
+      document.addEventListener("DOMContentLoaded", () => {
+        console.log("DOM ready");
 
-      fileInput.addEventListener("change", () => {
-        if (fileInput.files.length > 0) {
-          fileName.textContent = `Selected: ${fileInput.files[0].name} (${formatSize(fileInput.files[0].size)})`;
-        } else {
-          fileName.textContent = "";
-        }
-      });
+        const API = "http://localhost:3001";
+        const fileInput = document.getElementById("image");
+        const fileNameEl = document.getElementById("fileName");
+        const form = document.getElementById("uploadForm");
+        const message = document.getElementById("message");
+        const submitBtn = document.getElementById("submitBtn");
+        const imageList = document.getElementById("imageList");
 
-      function formatSize(bytes) {
-        if (bytes < 1024) return bytes + " B";
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-        return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-      }
+        console.log("Elements found:", {
+          fileInput, fileNameEl, form, message, submitBtn, imageList
+        });
 
-      function showMessage(text, type) {
-        message.textContent = text;
-        message.className = type;
-        message.style.display = "block";
-      }
-
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        if (!fileInput.files[0]) {
-          showMessage("Please select a file first.", "error");
+        if (!fileInput || !form || !message) {
+          console.error("Required DOM elements missing!");
           return;
         }
 
-        submitBtn.disabled = true;
-        submitBtn.textContent = "Uploading...";
-
-        const formData = new FormData();
-        formData.append("image", fileInput.files[0]);
-
-        try {
-          const res = await fetch(`${API}/uploadImage`, {
-            method: "POST",
-            body: formData,
-          });
-          const data = await res.json();
-
-          if (data.success) {
-            showMessage("Image uploaded successfully!", "success");
-            fileName.textContent = "";
-            form.reset();
-            loadImages();
-          } else {
-            showMessage(data.error || "Upload failed.", "error");
-          }
-        } catch (err) {
-          showMessage("Network error. Is the server running?", "error");
-        } finally {
-          submitBtn.disabled = false;
-          submitBtn.textContent = "Upload";
+        function formatSize(bytes) {
+          if (bytes < 1024) return bytes + " B";
+          if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+          return (bytes / (1024 * 1024)).toFixed(1) + " MB";
         }
-      });
 
-      async function loadImages() {
-        const list = document.getElementById("imageList");
-        try {
-          const res = await fetch(`${API}/images`);
-          const data = await res.json();
-          list.innerHTML = "";
+        function showMessage(text, type, autoHideMs = 4000) {
+          message.textContent = text;
+          message.className = type;
+          message.style.display = "block";
+          console.log("Message shown:", text, type);
+          if (autoHideMs) {
+            setTimeout(() => { message.style.display = "none"; }, autoHideMs);
+          }
+        }
 
-          if (!data.data || data.data.length === 0) {
-            list.innerHTML = '<p style="color:#666">No images uploaded yet.</p>';
+        fileInput.addEventListener("change", () => {
+          if (fileInput.files.length > 0) {
+            fileNameEl.textContent = `Selected: ${fileInput.files[0].name} (${formatSize(fileInput.files[0].size)})`;
+          } else {
+            fileNameEl.textContent = "";
+          }
+        });
+
+        async function loadImages() {
+          try {
+            const res = await fetch(`${API}/images`);
+            const data = await res.json();
+            imageList.innerHTML = "";
+
+            if (!data.data || data.data.length === 0) {
+              imageList.innerHTML = '<p style="color:#666">No images uploaded yet.</p>';
+              return;
+            }
+
+            data.data.forEach((img) => {
+              const div = document.createElement("div");
+              div.innerHTML = `
+                <img src="${img.path}" alt="${img.filename}" loading="lazy" />
+                <div class="name">${img.filename}</div>
+              `;
+              imageList.appendChild(div);
+            });
+          } catch (err) {
+            console.error("loadImages error:", err);
+            imageList.innerHTML = '<p style="color:#c00">Failed to load images.</p>';
+          }
+        }
+
+        form.addEventListener("submit", async (e) => {
+          console.log("Form submitted!");
+          e.preventDefault();
+          e.stopPropagation();
+
+          if (!fileInput.files[0]) {
+            showMessage("Please select a file first.", "error");
             return;
           }
 
-          data.data.forEach((img) => {
-            const div = document.createElement("div");
-            div.innerHTML = `
-              <img src="${img.path}" alt="${img.filename}" loading="lazy" />
-              <div class="name">${img.filename}</div>
-            `;
-            list.appendChild(div);
-          });
-        } catch (err) {
-          list.innerHTML = '<p style="color:#c00">Failed to load images. Is the server running?</p>';
-        }
-      }
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Uploading...";
+          showMessage("Uploading...", "success");
 
-      loadImages();
+          const formData = new FormData();
+          formData.append("image", fileInput.files[0]);
+
+          try {
+            const res = await fetch(`${API}/uploadImage`, {
+              method: "POST",
+              body: formData,
+            });
+            const data = await res.json();
+            console.log("Upload response:", res.status, data);
+
+            if (res.ok) {
+              showMessage("Image uploaded successfully!", "success");
+              fileNameEl.textContent = "";
+              form.reset();
+              loadImages();
+            } else {
+              showMessage(data.error || `Upload failed (${res.status}).`, "error");
+            }
+          } catch (err) {
+            console.error("Upload error:", err);
+            showMessage("Network error.", "error");
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Upload";
+          }
+        });
+
+        loadImages();
+      });
     </script>
   </body>
 </html>
