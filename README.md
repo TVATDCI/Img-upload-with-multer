@@ -27,22 +27,23 @@ src/
 ├── models/
 │   └── Image.js           # Mongoose schema
 ├── routes/
-│   ├── index.js            # Route aggregator
-│   └── imageRoutes.js      # API route definitions
+│   ├── index.js           # Route aggregator
+│   └── imageRoutes.js     # API route definitions
 ├── middlewares/
 │   ├── upload.js          # Multer configuration
 │   ├── errorHandler.js    # Global error handler
 │   └── multerError.js     # Multer error mapper
 └── utils/
     ├── fileUtils.js       # File cleanup helpers
-    └── responseHelper.js  # Standardized API responses
-app.js                     # Express app setup
-server.js                  # Entry point
+    └── responseHelper.js # Standardized API responses
 
 public/                    # Frontend (served at /)
-├── index.html             # HTML structure
-├── styles.css             # All styles (CSS variables)
-└── app.js                 # All JavaScript (AppState, fetch-based)
+├── index.html            # HTML structure
+├── styles.css            # Styles with CSS variables
+└── app.js               # JavaScript with AppState management
+
+server.js                 # Entry point
+app.js                    # Express app setup
 ```
 
 ## Setup
@@ -107,6 +108,10 @@ List all uploaded images, sorted newest first.
 
 Get a single image by ID.
 
+### `GET /images/:id/src`
+
+Proxy endpoint that serves image data. If the image is on Cloudinary, it fetches from Cloudinary and streams back through the Express server. If local, it serves from disk. This ensures images render in the browser even when Cloudinary CDN is blocked by the user's network.
+
 ### `DELETE /images/:id`
 
 Delete an image. Removes from Cloudinary (or local disk) then from MongoDB.
@@ -128,6 +133,7 @@ Delete an image. Removes from Cloudinary (or local disk) then from MongoDB.
 
 - **Cloudinary** — Primary storage. Images are uploaded to Cloudinary and served via CDN.
 - **Local fallback** — If Cloudinary upload fails, the image is stored locally in `./uploads/` and served at `/uploads/filename`.
+- **`localPath` tracking** — MongoDB stores the filesystem path for local files so deletion works correctly.
 
 ### Security
 
@@ -149,14 +155,13 @@ Delete an image. Removes from Cloudinary (or local disk) then from MongoDB.
 Access at **<http://localhost:3001>**
 
 - Fetch-based upload (no page reload)
-- Success/error messages with 5s auto-hide
+- Success/error messages with 5s auto-hide (green/red)
 - Loading spinner while fetching images
 - Image gallery with Cloudinary/Local badge per image
 - Delete button with confirmation dialog
-- Optimistic UI — card removed immediately, restored on failure
 - Client-side validation: file size (max 200KB) and MIME type
 - Accessibility: `aria-label` on delete buttons
-- Health check log when `/images` endpoint responds
+- Images served through `/images/:id/src` proxy (works around CDN blocking)
 
 ## Development
 
