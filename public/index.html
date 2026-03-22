@@ -1,29 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Image Upload</title>
+    <title>Image Upload from public folder</title>
     <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
-    <h1>Upload an Image</h1>
+</head>
+
+<body>
+    <h1>Upload an Image on the public folder</h1>
 
     <div id="message"></div>
 
     <div class="upload-box">
-      <form id="uploadForm">
-        <input type="file" id="image" name="image" accept="image/*" required aria-label="Select an image to upload" />
-        <div id="fileName" class="file-name"></div>
-        <button type="submit" id="submitBtn">Upload</button>
-      </form>
+        <form id="uploadForm">
+            <input type="file" id="image" name="image" accept="image/*" required
+                aria-label="Select an image to upload" />
+            <div id="fileName" class="file-name"></div>
+            <button type="submit" id="submitBtn">Upload</button>
+        </form>
     </div>
 
     <div class="gallery">
-      <h2>Uploaded Images</h2>
-      <div id="image-gallery"></div>
+        <h2>Uploaded Images</h2>
+        <div id="image-gallery"></div>
     </div>
 
     <script src="/app.js"></script>
-  </body>
+</body>
+
 </html>
