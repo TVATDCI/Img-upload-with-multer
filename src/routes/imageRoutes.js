@@ -7,6 +7,7 @@ import {
   getImageById,
   deleteImage,
   serveImage,
+  batchDeleteImages,
 } from '../controllers/imageController.js';
 
 const router = express.Router();
@@ -24,5 +25,6 @@ router.get('/images', getImages);
 router.get('/images/:id', getImageById);
 router.get('/images/:id/src', serveImage);
 router.delete('/images/:id', deleteImage);
+router.delete('/images/batch', batchDeleteImages);
 
 export default router;
