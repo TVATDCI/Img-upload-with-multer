@@ -6,6 +6,13 @@ const AppState = {
   selectedIds: [],
   viewMode: 'grid',
   searchQuery: '',
+  sortMode: 'date',
+  pagination: {
+    page: 1,
+    limit: 12,
+    total: 0,
+    hasMore: false,
+  },
   setState(updates) {
     Object.assign(this, updates);
   },
@@ -21,6 +28,52 @@ const bulkActionsBar = document.getElementById('bulk-actions-bar');
 const searchInput = document.getElementById('search-input');
 const viewToggleBtn = document.getElementById('view-toggle');
 const selectAllCheckbox = document.getElementById('select-all');
+
+// Lightbox state
+let lightboxVisible = false;
+let currentImageIndex = 0;
+
+function openLightbox(imageId) {
+  const images = getFilteredImages();
+  currentImageIndex = images.findIndex((img) => img._id === imageId);
+
+  if (currentImageIndex === -1) return;
+
+  const image = images[currentImageIndex];
+  const modal = document.getElementById('lightbox-modal');
+  const modalImg = document.getElementById('lightbox-image');
+
+  modalImg.src = `/images/${image._id}/src`;
+  modal.style.display = 'flex';
+  lightboxVisible = true;
+
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+  const modal = document.getElementById('lightbox-modal');
+  modal.style.display = 'none';
+  lightboxVisible = false;
+  document.body.style.overflow = '';
+}
+
+function navigateLightbox(direction) {
+  const images = getFilteredImages();
+  currentImageIndex = (currentImageIndex + direction + images.length) % images.length;
+
+  const image = images[currentImageIndex];
+  const modalImg = document.getElementById('lightbox-image');
+  modalImg.src = `/images/${image._id}/src`;
+}
+
+// Keyboard navigation for lightbox
+document.addEventListener('keydown', (e) => {
+  if (!lightboxVisible) return;
+
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowLeft') navigateLightbox(-1);
+  if (e.key === 'ArrowRight') navigateLightbox(1);
+});
 
 let hideTimer = null;
 
@@ -47,15 +100,31 @@ function showMessage(text, type, duration = 5000) {
 }
 
 function getFilteredImages() {
-  const query = AppState.searchQuery.toLowerCase().trim();
-  if (!query) return AppState.images;
+  let images = AppState.images;
 
-  return AppState.images.filter((img) => {
-    const filename = img.filename || '';
-    const isCloudinary = img.path && img.path.includes('cloudinary.com');
-    const storageType = isCloudinary ? 'cloudinary' : 'local';
-    return filename.toLowerCase().includes(query) || storageType.includes(query);
+  // Apply search filter
+  const query = AppState.searchQuery.toLowerCase().trim();
+  if (query) {
+    images = images.filter((img) => {
+      const filename = img.filename || '';
+      const isCloudinary = img.path && img.path.includes('cloudinary.com');
+      const storageType = isCloudinary ? 'cloudinary' : 'local';
+      return filename.toLowerCase().includes(query) || storageType.includes(query);
+    });
+  }
+
+  // Apply sorting
+  images = [...images].sort((a, b) => {
+    switch (AppState.sortMode) {
+      case 'name':
+        return (a.filename || '').localeCompare(b.filename || '');
+      case 'date':
+      default:
+        return new Date(b.uploadDate) - new Date(a.uploadDate);
+    }
   });
+
+  return images;
 }
 
 function renderSkeletons(count = 8) {
@@ -143,23 +212,73 @@ function toggleSelectAll(checked) {
 }
 
 async function loadImages() {
-  AppState.setState({ isLoading: true });
+  AppState.setState({
+    isLoading: true,
+    pagination: { page: 1, limit: 12, total: 0, hasMore: false },
+  });
   renderSkeletons(8);
 
   try {
-    const res = await fetch(`${API}images`);
+    const res = await fetch(`${API}images?page=1&limit=12`);
     const data = await res.json();
 
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
-    AppState.setState({ images: data.data || [], selectedIds: [] });
+    AppState.setState({
+      images: data.data?.data || [],
+      selectedIds: [],
+      pagination: {
+        page: 1,
+        limit: 12,
+        total: data.data?.pagination?.total || 0,
+        hasMore: data.data?.pagination?.hasMore || false,
+      },
+    });
     renderGallery(getFilteredImages());
     updateBulkActionsBar();
+    updateLoadMoreButton();
   } catch (err) {
     imageGallery.innerHTML =
       '<p class="empty-state">Failed to load images. Is the server running?</p>';
   } finally {
     AppState.setState({ isLoading: false });
+  }
+}
+
+async function loadMore() {
+  if (AppState.pagination.hasMore === false || AppState.isLoading) return;
+
+  AppState.setState({ isLoading: true });
+
+  try {
+    const nextPage = AppState.pagination.page + 1;
+    const res = await fetch(`${API}images?page=${nextPage}&limit=${AppState.pagination.limit}`);
+    const data = await res.json();
+
+    if (res.ok && data.data) {
+      AppState.setState({
+        images: [...AppState.images, ...data.data.data],
+        pagination: {
+          ...AppState.pagination,
+          page: nextPage,
+          total: data.data.pagination.total,
+          hasMore: data.data.pagination.hasMore,
+        },
+      });
+      renderGallery(getFilteredImages());
+      updateLoadMoreButton();
+    }
+  } catch (err) {
+    showMessage('Failed to load more images.', 'error');
+  } finally {
+    AppState.setState({ isLoading: false });
+  }
+}
+
+function updateLoadMoreButton() {
+  const loadMoreContainer = document.getElementById('load-more-container');
+  if (loadMoreContainer) {
+    loadMoreContainer.style.display = AppState.pagination.hasMore ? 'block' : 'none';
   }
 }
 
@@ -206,50 +325,58 @@ function deleteSelectedImages() {
 
   const cards = ids.map((id) => document.getElementById(`img-${id}`)).filter(Boolean);
 
+  // Optimistic UI: immediately hide cards
   cards.forEach((card) => {
     card.style.opacity = '0.5';
     card.style.transform = 'scale(0.95)';
   });
 
-  const deletePromises = ids.map((id, index) => {
-    const card = cards[index];
-    if (!card) return Promise.resolve(true);
+  fetch(`${API}images/batch`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ids }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success && data.data) {
+        const succeededIds = data.data.succeeded;
 
-    return fetch(`${API}images/${id}`, { method: 'DELETE' })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success || res.status === 404) {
-          card.remove();
-          return true;
+        // Remove successfully deleted images from state
+        AppState.images = AppState.images.filter((img) => !succeededIds.includes(img._id));
+        AppState.selectedIds = [];
+
+        renderGallery(getFilteredImages());
+        updateBulkActionsBar();
+
+        if (data.data.failed && data.data.failed.length > 0) {
+          showMessage(
+            `${data.data.succeeded.length} deleted, ${data.data.failed.length} failed.`,
+            'error'
+          );
+        } else {
+          showMessage(`${succeededIds.length} image(s) deleted.`, 'success', 3000);
         }
+      } else {
+        // Rollback: restore card visibility
+        cards.forEach((card) => {
+          card.style.opacity = '1';
+          card.style.transform = 'scale(1)';
+        });
+        showMessage(data.error || 'Batch delete failed.', 'error');
+      }
+    })
+    .catch(() => {
+      // Rollback on network error
+      cards.forEach((card) => {
         card.style.opacity = '1';
         card.style.transform = 'scale(1)';
-        return false;
-      })
-      .catch(() => {
-        card.style.opacity = '1';
-        card.style.transform = 'scale(1)';
-        return false;
       });
-  });
-
-  Promise.all(deletePromises).then((results) => {
-    const successful = results.filter((r) => r).length;
-    AppState.images = AppState.images.filter((img) => !ids.includes(img._id));
-    AppState.selectedIds = [];
-
-    renderGallery(getFilteredImages());
-    updateBulkActionsBar();
-
-    deleteSelectedBtn.disabled = false;
-    deleteSelectedBtn.textContent = 'Delete Selected';
-
-    if (successful === ids.length) {
-      showMessage(`${successful} image(s) deleted.`, 'success', 3000);
-    } else {
-      showMessage(`${successful} of ${ids.length} deleted. Some failed.`, 'error');
-    }
-  });
+      showMessage('Network error during batch delete.', 'error');
+    })
+    .finally(() => {
+      deleteSelectedBtn.disabled = false;
+      deleteSelectedBtn.textContent = 'Delete Selected';
+    });
 }
 
 fileInput.addEventListener('change', () => {
@@ -341,6 +468,21 @@ viewToggleBtn.addEventListener('click', () => {
   renderGallery(getFilteredImages());
 });
 
+// Sort select handler
+const sortSelect = document.getElementById('sort-select');
+if (sortSelect) {
+  sortSelect.addEventListener('change', (e) => {
+    AppState.sortMode = e.target.value;
+    renderGallery(getFilteredImages());
+  });
+}
+
+// Load more button handler
+const loadMoreBtn = document.getElementById('load-more-btn');
+if (loadMoreBtn) {
+  loadMoreBtn.addEventListener('click', loadMore);
+}
+
 selectAllCheckbox.addEventListener('change', (e) => {
   toggleSelectAll(e.target.checked);
 });
@@ -364,7 +506,16 @@ imageGallery.addEventListener('click', (e) => {
   }
 
   const btn = e.target.closest('.btn-delete');
-  if (!btn) return;
+  if (!btn) {
+    // Check if clicking on image card to open lightbox
+    const card = e.target.closest('.image-card');
+    if (card) {
+      const imageId = card.id.replace('img-', '');
+      openLightbox(imageId);
+      return;
+    }
+    return;
+  }
 
   const id = btn.dataset.id;
   const card = document.getElementById(`img-${id}`);
@@ -379,5 +530,31 @@ imageGallery.addEventListener('click', (e) => {
     updateBulkActionsBar();
   });
 });
+
+// Lightbox close button handler
+const lightboxClose = document.getElementById('lightbox-close');
+if (lightboxClose) {
+  lightboxClose.addEventListener('click', closeLightbox);
+}
+
+// Lightbox navigation handlers
+const lightboxPrev = document.getElementById('lightbox-prev');
+const lightboxNext = document.getElementById('lightbox-next');
+if (lightboxPrev) {
+  lightboxPrev.addEventListener('click', () => navigateLightbox(-1));
+}
+if (lightboxNext) {
+  lightboxNext.addEventListener('click', () => navigateLightbox(1));
+}
+
+// Close lightbox when clicking outside image
+const lightboxModal = document.getElementById('lightbox-modal');
+if (lightboxModal) {
+  lightboxModal.addEventListener('click', (e) => {
+    if (e.target === lightboxModal) {
+      closeLightbox();
+    }
+  });
+}
 
 loadImages();

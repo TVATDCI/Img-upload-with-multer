@@ -31,6 +31,14 @@ export const getAllImages = async () => {
   return Image.find().sort({ uploadDate: -1 });
 };
 
+export const getImagesPaginated = async (skip, limit) => {
+  return Image.find().sort({ uploadDate: -1 }).skip(skip).limit(limit);
+};
+
+export const getTotalImageCount = async () => {
+  return Image.countDocuments();
+};
+
 export const getImageById = async (id) => {
   return Image.findById(id);
 };
@@ -53,4 +61,24 @@ export const deleteImage = async (id) => {
 
   await Image.findByIdAndDelete(id);
   return image;
+};
+
+export const batchDeleteImages = async (ids) => {
+  const results = await Promise.allSettled(ids.map((id) => deleteImage(id)));
+
+  const succeeded = [];
+  const failed = [];
+
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled' && result.value) {
+      succeeded.push(ids[index]);
+    } else {
+      failed.push({
+        id: ids[index],
+        reason: result.reason?.message || 'Delete failed',
+      });
+    }
+  });
+
+  return { succeeded, failed, results };
 };

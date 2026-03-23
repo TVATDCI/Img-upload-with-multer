@@ -30,8 +30,25 @@ export const handleUpload = async (req, res, next) => {
 
 export const getImages = async (req, res, next) => {
   try {
-    const images = await imageService.getAllImages();
-    return success(res, images);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const skip = (page - 1) * limit;
+
+    const [images, total] = await Promise.all([
+      imageService.getImagesPaginated(skip, limit),
+      imageService.getTotalImageCount(),
+    ]);
+
+    return success(res, {
+      data: images,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: page * limit < total,
+      },
+    });
   } catch (err) {
     next(err);
   }
@@ -56,6 +73,30 @@ export const deleteImage = async (req, res, next) => {
       return notFound(res, 'Image not found!');
     }
     return success(res, null, 'Image deleted successfully!');
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const batchDeleteImages = async (req, res, next) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return badRequest(res, 'No IDs provided');
+    }
+
+    const results = await imageService.batchDeleteImages(ids);
+
+    return success(
+      res,
+      {
+        total: ids.length,
+        succeeded: results.succeeded,
+        failed: results.failed,
+      },
+      `${results.succeeded.length} of ${ids.length} images deleted`
+    );
   } catch (err) {
     next(err);
   }
