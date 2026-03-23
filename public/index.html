@@ -23,7 +23,22 @@
     </div>
 
     <div class="gallery">
-        <h2>Uploaded Images</h2>
+        <div class="gallery-header">
+            <h2>Uploaded Images</h2>
+            <div class="gallery-controls">
+                <input type="text" id="search-input" class="search-input" placeholder="Search by filename or storage type..." aria-label="Search images" />
+                <button id="view-toggle" class="btn-toggle">Switch to List View</button>
+            </div>
+        </div>
+        
+        <div id="bulk-actions-bar" class="bulk-actions-bar">
+            <label class="select-all-label">
+                <input type="checkbox" id="select-all" />
+                <span id="selected-count">0 selected</span>
+            </label>
+            <button id="delete-selected-btn" class="btn-delete-selected">Delete Selected</button>
+        </div>
+        
         <div id="image-gallery"></div>
     </div>
 
