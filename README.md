@@ -1,6 +1,17 @@
 # Image Upload API
 
-A production-ready Express.js image upload API with MongoDB storage and Cloudinary cloud storage.
+A production-ready Express.js image upload API with MongoDB storage and Cloudinary cloud storage. Developed from a student project through enterprise-grade enhancements.
+
+## 📚 Version History
+
+| Version                                                                 | Description                                             | Date     |
+| ----------------------------------------------------------------------- | ------------------------------------------------------- | -------- |
+| [v1.0](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1)       | Basic image upload with Multer + MongoDB                | Original |
+| [v1.1.x](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1.1)   | Cloudinary integration with local fallback              | Phase 1  |
+| [v1.1.3](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1.1.3) | Enterprise features: batch delete, pagination, lightbox | Phase 2  |
+| [main](https://github.com/TVATDCI/Img-upload-with-multer/tree/main)     | Advanced metadata: size, displayName, sorting           | Current  |
+
+---
 
 ## Tech Stack
 
@@ -11,6 +22,8 @@ A production-ready Express.js image upload API with MongoDB storage and Cloudina
 - **Helmet** — Security headers
 - **express-rate-limit** — Upload rate limiting
 - **ESLint + Prettier** — Code linting and formatting
+
+---
 
 ## Project Structure
 
@@ -35,7 +48,7 @@ src/
 │   └── multerError.js     # Multer error mapper
 └── utils/
     ├── fileUtils.js       # File cleanup helpers
-    └── responseHelper.js # Standardized API responses
+    └── responseHelper.js  # Standardized API responses
 
 public/                    # Frontend (served at /)
 ├── index.html            # HTML structure
@@ -45,6 +58,8 @@ public/                    # Frontend (served at /)
 server.js                 # Entry point
 app.js                    # Express app setup
 ```
+
+---
 
 ## Setup
 
@@ -60,15 +75,15 @@ npm install
 cp .env.example .env
 ```
 
-| Variable | Description |
-|---|---|
-| `MONGO_URI` | MongoDB connection string (local or Atlas) |
-| `PORT` | Server port (default: 3001) |
-| `UPLOADS_FOLDER` | Local upload directory (default: `./uploads`) |
-| `ALLOWED_ORIGINS` | CORS allowed origins (comma-separated) |
-| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name |
-| `CLOUDINARY_API_KEY` | Cloudinary API key |
-| `CLOUDINARY_API_SECRET` | Cloudinary API secret |
+| Variable                | Description                                   |
+| ----------------------- | --------------------------------------------- |
+| `MONGO_URI`             | MongoDB connection string (local or Atlas)    |
+| `PORT`                  | Server port (default: 3001)                   |
+| `UPLOADS_FOLDER`        | Local upload directory (default: `./uploads`) |
+| `ALLOWED_ORIGINS`       | CORS allowed origins (comma-separated)        |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name                         |
+| `CLOUDINARY_API_KEY`    | Cloudinary API key                            |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret                         |
 
 ### 3. Start the server
 
@@ -76,7 +91,19 @@ cp .env.example .env
 npm start
 ```
 
+---
+
 ## API Endpoints
+
+| Method | Endpoint                  | Description                  |
+| ------ | ------------------------- | ---------------------------- |
+| POST   | `/uploadImage`            | Upload an image (max 200KB)  |
+| GET    | `/images?page=1&limit=12` | Paginated image list         |
+| GET    | `/images/:id`             | Single image by ID           |
+| GET    | `/images/:id/src`         | Image proxy for lightbox     |
+| PATCH  | `/images/:id/displayName` | Update display name          |
+| DELETE | `/images/:id`             | Delete single image          |
+| DELETE | `/images/batch`           | Batch delete multiple images |
 
 ### `POST /uploadImage`
 
@@ -91,6 +118,9 @@ Upload an image. Supports JPEG, PNG, GIF, WebP. Max size: **200KB**.
   "data": {
     "_id": "...",
     "filename": "uuid-filename.jpg",
+    "originalName": "my-photo.jpg",
+    "displayName": "My Vacation Photo",
+    "size": 154200,
     "path": "https://res.cloudinary.com/.../uuid-filename.jpg",
     "publicId": "img-upload/uuid-filename",
     "localPath": null,
@@ -100,32 +130,69 @@ Upload an image. Supports JPEG, PNG, GIF, WebP. Max size: **200KB**.
 }
 ```
 
-### `GET /images`
+### `GET /images?page=1&limit=12`
 
-List all uploaded images, sorted newest first.
+Paginated image list with metadata.
 
-### `GET /images/:id`
+**Response:**
 
-Get a single image by ID.
+```json
+{
+  "success": true,
+  "message": "Success",
+  "data": {
+    "data": [...],
+    "pagination": {
+      "page": 1,
+      "limit": 12,
+      "total": 50,
+      "totalPages": 5,
+      "hasMore": true
+    }
+  }
+}
+```
 
-### `GET /images/:id/src`
+### `DELETE /images/batch`
 
-Proxy endpoint that serves image data. If the image is on Cloudinary, it fetches from Cloudinary and streams back through the Express server. If local, it serves from disk. This ensures images render in the browser even when Cloudinary CDN is blocked by the user's network.
+Batch delete multiple images in one request.
 
-### `DELETE /images/:id`
+**Request:**
 
-Delete an image. Removes from Cloudinary (or local disk) then from MongoDB.
+```json
+{
+  "ids": ["id1", "id2", "id3"]
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "3 of 3 images deleted",
+  "data": {
+    "total": 3,
+    "succeeded": ["id1", "id2", "id3"],
+    "failed": []
+  }
+}
+```
+
+---
 
 ## Error Responses
 
-| HTTP Status | Meaning |
-|---|---|
-| 400 | Bad request (no file, invalid ID) |
-| 413 | File too large (max 200KB) |
-| 415 | Invalid file type |
-| 404 | Image not found |
-| 429 | Too many uploads (rate limited) |
-| 500 | Server error |
+| HTTP Status | Meaning                           |
+| ----------- | --------------------------------- |
+| 400         | Bad request (no file, invalid ID) |
+| 413         | File too large (max 200KB)        |
+| 415         | Invalid file type                 |
+| 404         | Image not found                   |
+| 429         | Too many uploads (rate limited)   |
+| 500         | Server error                      |
+
+---
 
 ## Features
 
@@ -152,16 +219,43 @@ Delete an image. Removes from Cloudinary (or local disk) then from MongoDB.
 
 ### Frontend (`public/`)
 
-Access at **<http://localhost:3001>**
+Access at **http://localhost:3001**
 
 - Fetch-based upload (no page reload)
-- Success/error messages with 5s auto-hide (green/red)
-- Loading spinner while fetching images
+- Success/error messages with auto-hide (green/red toasts)
+- Loading skeleton screens while fetching images
 - Image gallery with Cloudinary/Local badge per image
-- Delete button with confirmation dialog
+- **Delete button** with confirmation dialog
+- **Bulk delete** - Select multiple images and delete at once
+- **Search** - Filter by filename, originalName, displayName, or storage type
+- **Sort** - By Date (newest), Name (A-Z), or Size (largest)
+- **Load More** - Pagination button for large galleries
+- **Lightbox** - Click image to open full-size preview with keyboard navigation (Esc, Arrow keys)
+- **Rename** - Custom display names for images (pencil icon)
+- **Select All** - Bulk select/deselect with checkbox
 - Client-side validation: file size (max 200KB) and MIME type
-- Accessibility: `aria-label` on delete buttons
+- Accessibility: `aria-label` on all interactive elements
 - Images served through `/images/:id/src` proxy (works around CDN blocking)
+
+---
+
+## Image Schema
+
+```javascript
+{
+  filename: String,        // System-generated unique filename
+  originalName: String,   // Original filename from upload
+  displayName: String,    // Custom display name (user-editable)
+  path: String,           // Cloudinary URL or local path
+  publicId: String,       // Cloudinary public ID
+  localPath: String,      // Local file path if not on Cloudinary
+  size: Number,           // File size in bytes
+  uploadDate: Date,       // Upload timestamp
+  user_ip: String         // User IP address
+}
+```
+
+---
 
 ## Development
 
@@ -171,7 +265,11 @@ npm run lint     # Run ESLint
 npm run format   # Format code with Prettier
 ```
 
-## Original Student Tasks
+---
+
+## Original Student Tasks (v1.0)
+
+This project started as a student exercise:
 
 1. Install npm packages: express, mongoose, multer, cors
 2. Configure Multer with `./uploads` destination and 200KB file limit
@@ -179,3 +277,45 @@ npm run format   # Format code with Prettier
 4. Test basic image upload
 5. Create an Image schema with filename, path, uploadDate, user_ip
 6. Save image metadata to MongoDB on upload
+
+---
+
+## Evolution Timeline
+
+### v1.0 - Basic Upload
+
+- Simple Express + Multer + MongoDB setup
+- Local file storage only
+- Basic HTML form
+
+### v1.1 - Cloudinary Integration
+
+- Added Cloudinary SDK integration
+- Images uploaded to cloud by default
+- Local fallback if cloud fails
+- Added security: Helmet, rate limiting, CORS
+- Modernized frontend with fetch API
+
+### v1.1.3 - Enterprise Features
+
+- Batch delete endpoint (single API call for multiple deletes)
+- Pagination (Load More button)
+- Lightbox modal for image preview
+- Keyboard navigation (Esc, Arrows)
+- Optimistic UI for better UX
+
+### Current (main) - Advanced Metadata
+
+- File size tracking for sorting
+- Original filename preservation
+- Custom display names (renamable)
+- Enhanced search (by display name)
+- Sort by size option
+- Bulk actions bar
+- Checkbox sync improvements
+
+---
+
+## License
+
+MIT
