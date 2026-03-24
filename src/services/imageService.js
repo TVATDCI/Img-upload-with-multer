@@ -2,7 +2,7 @@ import Image from '../models/Image.js';
 import { uploadToCloudinary, deleteFromCloudinary } from './cloudinaryService.js';
 import { deleteFile } from '../utils/fileUtils.js';
 
-export const createImage = async ({ filename, localFilePath, user_ip }) => {
+export const createImage = async ({ filename, originalName, localFilePath, size, user_ip }) => {
   let publicId = null;
   let path = `/uploads/${filename}`;
 
@@ -17,9 +17,11 @@ export const createImage = async ({ filename, localFilePath, user_ip }) => {
 
   const image = new Image({
     filename,
+    originalName: originalName || filename,
     path,
     publicId,
     localPath: publicId ? null : localFilePath,
+    size,
     uploadDate: new Date(),
     user_ip,
   });
@@ -41,6 +43,10 @@ export const getTotalImageCount = async () => {
 
 export const getImageById = async (id) => {
   return Image.findById(id);
+};
+
+export const updateImageDisplayName = async (id, displayName) => {
+  return Image.findByIdAndUpdate(id, { displayName }, { new: true });
 };
 
 export const deleteImage = async (id) => {
