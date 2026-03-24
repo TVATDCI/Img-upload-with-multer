@@ -8,6 +8,7 @@ import {
   deleteImage,
   serveImage,
   batchDeleteImages,
+  updateDisplayName,
 } from '../controllers/imageController.js';
 
 const router = express.Router();
@@ -24,6 +25,7 @@ router.post('/uploadImage', uploadLimiter, uploadImage, handleUpload);
 router.get('/images', getImages);
 router.get('/images/:id', getImageById);
 router.get('/images/:id/src', serveImage);
+router.patch('/images/:id/displayName', updateDisplayName);
 router.delete('/images/:id', deleteImage);
 router.delete('/images/batch', batchDeleteImages);
 
