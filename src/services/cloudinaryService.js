@@ -7,10 +7,11 @@ cloudinary.config({
   api_secret: env.cloudinary.apiSecret,
 });
 
-export const uploadToCloudinary = (filePath) => {
+export const uploadToCloudinary = (filePath, options = {}) => {
   return cloudinary.uploader.upload(filePath, {
     folder: 'img-upload',
     resource_type: 'auto',
+    ...options,
   });
 };
 

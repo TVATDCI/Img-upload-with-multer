@@ -62,7 +62,7 @@
       </div>
     </div>
 
-    <!-- Lightbox Modal -->
+    <!-- Lightbox Modal (Inspector) -->
     <div
       id="lightbox-modal"
       class="lightbox-modal"
@@ -71,13 +71,79 @@
       aria-label="Image preview"
     >
       <button id="lightbox-close" class="lightbox-close" aria-label="Close">&times;</button>
-      <button id="lightbox-prev" class="lightbox-nav lightbox-prev" aria-label="Previous image">
-        &larr;
-      </button>
-      <img id="lightbox-image" class="lightbox-image" src="" alt="Full size image" />
-      <button id="lightbox-next" class="lightbox-nav lightbox-next" aria-label="Next image">
-        &rarr;
-      </button>
+
+      <div class="lightbox-content">
+        <div class="lightbox-preview">
+          <button id="lightbox-prev" class="lightbox-nav lightbox-prev" aria-label="Previous image">
+            &larr;
+          </button>
+          <img id="lightbox-image" class="lightbox-image" src="" alt="Full size image" />
+          <button id="lightbox-next" class="lightbox-nav lightbox-next" aria-label="Next image">
+            &rarr;
+          </button>
+        </div>
+
+        <div class="lightbox-sidebar">
+          <h3 class="sidebar-title">Asset Inspector</h3>
+
+          <div class="inspector-section">
+            <h4>Info</h4>
+            <div class="inspector-field">
+              <span class="field-label">Display Name:</span>
+              <span id="inspector-displayName" class="field-value">-</span>
+            </div>
+            <div class="inspector-field">
+              <span class="field-label">Original Name:</span>
+              <span id="inspector-originalName" class="field-value">-</span>
+            </div>
+            <div class="inspector-field">
+              <span class="field-label">Uploaded:</span>
+              <span id="inspector-uploadDate" class="field-value">-</span>
+            </div>
+          </div>
+
+          <div class="inspector-section">
+            <h4>Technical</h4>
+            <div class="inspector-field">
+              <span class="field-label">Dimensions:</span>
+              <span id="inspector-dimensions" class="field-value">-</span>
+            </div>
+            <div class="inspector-field">
+              <span class="field-label">File Size:</span>
+              <span id="inspector-size" class="field-value">-</span>
+            </div>
+            <div class="inspector-field">
+              <span class="field-label">Type:</span>
+              <span id="inspector-fileType" class="field-value">-</span>
+            </div>
+          </div>
+
+          <div class="inspector-section">
+            <h4>Colors</h4>
+            <div id="inspector-colors" class="color-swatches"></div>
+          </div>
+
+          <div class="inspector-section">
+            <h4>Tags</h4>
+            <div id="inspector-tags" class="tag-chips"></div>
+          </div>
+
+          <div class="inspector-actions">
+            <button id="inspector-download" class="btn-inspector">Download</button>
+            <button id="inspector-copy" class="btn-inspector">Copy Link</button>
+            <button id="inspector-rename" class="btn-inspector">Rename</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tag Filter Dropdown (hidden by default) -->
+    <div id="tag-filter-dropdown" class="tag-filter-dropdown hidden">
+      <div class="tag-filter-header">
+        <span>Filter by tag</span>
+        <button id="tag-filter-clear" class="btn-clear">Clear</button>
+      </div>
+      <div id="tag-filter-list" class="tag-filter-list"></div>
     </div>
 
     <script src="/app.js"></script>

@@ -55,6 +55,8 @@ function openLightbox(imageId) {
     showMessage('Failed to load image preview.', 'error');
   };
 
+  updateInspectorSidebar(image);
+
   modal.style.display = 'flex';
   lightboxVisible = true;
 
@@ -75,6 +77,89 @@ function navigateLightbox(direction) {
   const image = images[currentImageIndex];
   const modalImg = document.getElementById('lightbox-image');
   modalImg.src = `/images/${image._id}/src`;
+
+  updateInspectorSidebar(image);
+}
+
+function updateInspectorSidebar(image) {
+  const displayName = getImageDisplayName(image);
+  document.getElementById('inspector-displayName').textContent = displayName;
+  document.getElementById('inspector-originalName').textContent =
+    image.originalName || image.filename || '-';
+
+  const uploadDate = image.uploadDate ? new Date(image.uploadDate).toLocaleDateString() : '-';
+  document.getElementById('inspector-uploadDate').textContent = uploadDate;
+
+  const dimensions =
+    image.dimensions?.width && image.dimensions?.height
+      ? `${image.dimensions.width} × ${image.dimensions.height} px`
+      : '-';
+  document.getElementById('inspector-dimensions').textContent = dimensions;
+
+  document.getElementById('inspector-size').textContent = image.size ? formatSize(image.size) : '-';
+  document.getElementById('inspector-fileType').textContent = image.fileType || '-';
+
+  const colorsContainer = document.getElementById('inspector-colors');
+  colorsContainer.innerHTML = '';
+  if (image.colors && image.colors.length > 0) {
+    image.colors.slice(0, 6).forEach((color) => {
+      const swatch = document.createElement('div');
+      swatch.className = 'color-swatch';
+      swatch.style.backgroundColor = color;
+      swatch.title = color;
+      swatch.addEventListener('click', () => {
+        navigator.clipboard.writeText(color);
+        showMessage(`Copied ${color}`, 'success', 2000);
+      });
+      colorsContainer.appendChild(swatch);
+    });
+  } else {
+    colorsContainer.innerHTML = '<span class="field-value">-</span>';
+  }
+
+  const tagsContainer = document.getElementById('inspector-tags');
+  tagsContainer.innerHTML = '';
+  if (image.tags && image.tags.length > 0) {
+    image.tags.forEach((tag) => {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      chip.textContent = tag;
+      chip.addEventListener('click', () => {
+        AppState.searchQuery = tag;
+        document.getElementById('search-input').value = tag;
+        renderGallery(getFilteredImages());
+        closeLightbox();
+      });
+      tagsContainer.appendChild(chip);
+    });
+  } else {
+    tagsContainer.innerHTML = '<span class="tag-chip empty">No tags</span>';
+  }
+
+  const downloadBtn = document.getElementById('inspector-download');
+  const copyBtn = document.getElementById('inspector-copy');
+  const renameBtn = document.getElementById('inspector-rename');
+
+  downloadBtn.onclick = () => {
+    const link = document.createElement('a');
+    link.href = `/images/${image._id}/src`;
+    link.download = displayName;
+    link.click();
+  };
+
+  copyBtn.onclick = () => {
+    const proxyUrl = `${window.location.origin}/images/${image._id}/src`;
+    navigator.clipboard.writeText(proxyUrl);
+    showMessage('Proxy link copied!', 'success', 2000);
+  };
+
+  renameBtn.onclick = () => {
+    closeLightbox();
+    const editBtn = document.querySelector(`.btn-edit-name[data-id="${image._id}"]`);
+    if (editBtn) {
+      editBtn.click();
+    }
+  };
 }
 
 // Keyboard navigation for lightbox
@@ -129,12 +214,14 @@ function getFilteredImages() {
       const filename = img.filename || '';
       const originalName = img.originalName || '';
       const displayName = getImageDisplayName(img);
+      const tags = img.tags ? img.tags.join(' ').toLowerCase() : '';
       const isCloudinary = img.path && img.path.includes('cloudinary.com');
       const storageType = isCloudinary ? 'cloudinary' : 'local';
       return (
         filename.toLowerCase().includes(query) ||
         originalName.toLowerCase().includes(query) ||
         displayName.toLowerCase().includes(query) ||
+        tags.includes(query) ||
         storageType.includes(query)
       );
     });
@@ -185,6 +272,18 @@ function renderGallery(images) {
     const card = document.createElement('div');
     const isSelected = AppState.selectedIds.includes(img._id);
     const displayName = getImageDisplayName(img);
+
+    const colorDots =
+      img.colors && img.colors.length > 0
+        ? img.colors
+            .slice(0, 6)
+            .map(
+              (color) =>
+                `<div class="card-color-dot" style="background-color: ${color}" title="${color}"></div>`
+            )
+            .join('')
+        : '';
+
     card.className = `image-card ${isSelected ? 'selected' : ''}`;
     card.id = `img-${img._id}`;
     card.innerHTML = `
@@ -198,6 +297,7 @@ function renderGallery(images) {
           <button class="btn-edit-name" data-id="${img._id}" title="Rename" aria-label="Rename image">&#9998;</button>
           ${getStorageBadge(img.path)}
         </div>
+        ${colorDots ? `<div class="card-colors">${colorDots}</div>` : ''}
         <button
           class="btn-delete"
           data-id="${img._id}"

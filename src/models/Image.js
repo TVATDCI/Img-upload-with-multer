@@ -9,6 +9,13 @@ const imageSchema = new mongoose.Schema(
     publicId: { type: String },
     localPath: { type: String },
     size: { type: Number },
+    dimensions: {
+      width: { type: Number },
+      height: { type: Number },
+    },
+    tags: [{ type: String }],
+    colors: [{ type: String }],
+    fileType: { type: String },
     uploadDate: { type: Date, default: Date.now },
     user_ip: { type: String, required: true },
   },
