@@ -46,11 +46,18 @@ function openLightbox(imageId) {
   const modal = document.getElementById('lightbox-modal');
   const modalImg = document.getElementById('lightbox-image');
 
+  modalImg.alt = image.filename || 'Full size image';
   modalImg.src = `/images/${image._id}/src`;
+
+  modalImg.onerror = () => {
+    modalImg.src = '';
+    modalImg.alt = 'Failed to load image';
+    showMessage('Failed to load image preview.', 'error');
+  };
+
   modal.style.display = 'flex';
   lightboxVisible = true;
 
-  // Prevent body scroll
   document.body.style.overflow = 'hidden';
 }
 
@@ -94,6 +101,15 @@ function getStorageBadge(path) {
   return '<span class="badge badge-local">Local</span>';
 }
 
+function getImageDisplayName(img) {
+  if (img.displayName) return img.displayName;
+  if (img.publicId) {
+    const parts = img.publicId.split('/');
+    return parts[parts.length - 1];
+  }
+  return img.originalName || img.filename;
+}
+
 function showMessage(text, type, duration = 5000) {
   if (hideTimer) clearTimeout(hideTimer);
   message.textContent = text;
@@ -111,9 +127,16 @@ function getFilteredImages() {
   if (query) {
     images = images.filter((img) => {
       const filename = img.filename || '';
+      const originalName = img.originalName || '';
+      const displayName = getImageDisplayName(img);
       const isCloudinary = img.path && img.path.includes('cloudinary.com');
       const storageType = isCloudinary ? 'cloudinary' : 'local';
-      return filename.toLowerCase().includes(query) || storageType.includes(query);
+      return (
+        filename.toLowerCase().includes(query) ||
+        originalName.toLowerCase().includes(query) ||
+        displayName.toLowerCase().includes(query) ||
+        storageType.includes(query)
+      );
     });
   }
 
@@ -121,7 +144,9 @@ function getFilteredImages() {
   images = [...images].sort((a, b) => {
     switch (AppState.sortMode) {
       case 'name':
-        return (a.filename || '').localeCompare(b.filename || '');
+        return getImageDisplayName(a).localeCompare(getImageDisplayName(b));
+      case 'size':
+        return (b.size || 0) - (a.size || 0);
       case 'date':
       default:
         return new Date(b.uploadDate) - new Date(a.uploadDate);
@@ -152,21 +177,27 @@ function renderGallery(images) {
 
   if (!images || images.length === 0) {
     imageGallery.innerHTML = '<p class="empty-state">No images uploaded yet.</p>';
+    selectAllCheckbox.checked = false;
     return;
   }
 
   images.forEach((img) => {
     const card = document.createElement('div');
     const isSelected = AppState.selectedIds.includes(img._id);
+    const displayName = getImageDisplayName(img);
     card.className = `image-card ${isSelected ? 'selected' : ''}`;
     card.id = `img-${img._id}`;
     card.innerHTML = `
       <div class="card-checkbox">
         <input type="checkbox" class="img-checkbox" data-id="${img._id}" ${isSelected ? 'checked' : ''} />
       </div>
-      <img src="/images/${img._id}/src" alt="Uploaded image" title="Click to preview" aria-label="Click to open full-size preview" />
+      <img src="/images/${img._id}/src" alt="${displayName}" title="${displayName}" aria-label="Click to open full-size preview" />
       <div class="card-details">
-        <div class="image-meta">${getStorageBadge(img.path)}</div>
+        <div class="image-meta">
+          <span class="image-filename" data-id="${img._id}" title="Click to rename">${displayName}</span>
+          <button class="btn-edit-name" data-id="${img._id}" title="Rename" aria-label="Rename image">&#9998;</button>
+          ${getStorageBadge(img.path)}
+        </div>
         <button
           class="btn-delete"
           data-id="${img._id}"
@@ -178,19 +209,33 @@ function renderGallery(images) {
     `;
     imageGallery.appendChild(card);
   });
+
+  syncSelectAllCheckbox(images);
+}
+
+function syncSelectAllCheckbox(images) {
+  const allCheckboxes = imageGallery.querySelectorAll('.img-checkbox');
+  const filteredImages = getFilteredImages();
+  selectAllCheckbox.checked =
+    allCheckboxes.length > 0 &&
+    Array.from(allCheckboxes).every((cb) => cb.checked) &&
+    allCheckboxes.length === filteredImages.length;
 }
 
 function updateBulkActionsBar() {
   const count = AppState.selectedIds.length;
+  const bulkActionsBar = document.getElementById('bulk-actions-bar');
   const selectedCountEl = document.getElementById('selected-count');
   const deleteSelectedBtn = document.getElementById('delete-selected-btn');
 
   if (count > 0) {
     selectedCountEl.textContent = `${count} selected`;
     deleteSelectedBtn.style.display = 'inline-block';
+    bulkActionsBar.classList.add('visible');
   } else {
     selectedCountEl.textContent = '0 selected';
     deleteSelectedBtn.style.display = 'none';
+    bulkActionsBar.classList.remove('visible');
   }
 }
 
@@ -442,7 +487,14 @@ form.addEventListener('submit', (e) => {
 
         if (data.data) {
           AppState.images = [data.data, ...AppState.images];
+          AppState.pagination = {
+            page: 1,
+            limit: 12,
+            total: AppState.pagination.total + 1,
+            hasMore: false,
+          };
           renderGallery(getFilteredImages());
+          updateLoadMoreButton();
         } else {
           loadImages();
         }
@@ -566,5 +618,50 @@ if (lightboxModal) {
     }
   });
 }
+
+// Rename button handler
+imageGallery.addEventListener('click', (e) => {
+  const editBtn = e.target.closest('.btn-edit-name');
+  if (!editBtn) return;
+
+  e.stopPropagation();
+  const id = editBtn.dataset.id;
+  const image = AppState.images.find((img) => img._id === id);
+  if (!image) return;
+
+  const currentName = getImageDisplayName(image);
+  const newName = prompt('Enter new name for this image:', currentName);
+
+  if (!newName || newName.trim() === currentName) return;
+
+  editBtn.disabled = true;
+  editBtn.textContent = '...';
+
+  fetch(`${API}images/${id}/displayName`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ displayName: newName.trim() }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success && data.data) {
+        const idx = AppState.images.findIndex((img) => img._id === id);
+        if (idx !== -1) {
+          AppState.images[idx] = { ...AppState.images[idx], displayName: newName.trim() };
+        }
+        renderGallery(getFilteredImages());
+        showMessage('Image renamed successfully!', 'success', 3000);
+      } else {
+        showMessage(data.error || 'Failed to rename image.', 'error');
+      }
+    })
+    .catch(() => {
+      showMessage('Network error.', 'error');
+    })
+    .finally(() => {
+      editBtn.disabled = false;
+      editBtn.innerHTML = '&#9998;';
+    });
+});
 
 loadImages();
