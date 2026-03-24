@@ -22,6 +22,11 @@
 - **The Solution:** Implement "Load More" to prevent DOM lag with large collections.
 - **Requirement:** Backend `GET /images` must support `limit` and `skip` query parameters.
 
+### 5. Image Display Name (Custom Naming)
+
+- **The Solution:** Allow users to rename images for better display names.
+- **Requirement:** Add `displayName` field to Image schema and provide UI to edit it.
+
 ---
 
 ## ⚖️ Governance Rules (The "How")
@@ -40,64 +45,88 @@
 
 ---
 
-## 🤖 Integrated Prompt for Agent: Enterprise Refactor Phase 2
+## 🤖 Implementation Status
 
-# Role
+### ✅ Completed Tasks
 
-Senior Full-Stack Engineer. You are implementing Phase 2 of the Asset Manager refactor.
+#### Backend (src/)
 
-# Task 1: Backend Efficiency (src/)
+- [x] **Batch Delete Endpoint** - `DELETE /images/batch` with `Promise.allSettled()`
+- [x] **Pagination** - `GET /images?page=1&limit=12` with total/hasMore
+- [x] **Image Schema Updates** - Added `size`, `originalName`, `displayName` fields
+- [x] **Display Name API** - `PATCH /images/:id/displayName` endpoint
+- [x] **Lightbox Proxy** - `/images/:id/src` endpoint for serving images
 
-- **Batch Route:** Create `DELETE /images/batch` in `imageRoutes.js`.
-- **Controller/Service:** Handle an array of `ids`. Use `Promise.allSettled()` to clean up Cloudinary/Local storage and MongoDB records.
-- **Pagination:** Update `GET /images` to handle `page` and `limit` parameters (default: 12 per page).
+#### Frontend (public/app.js)
 
-# Task 2: Advanced Frontend Logic (public/app.js)
+- [x] **Batch Delete** - Uses `/images/batch` endpoint with optimistic UI
+- [x] **Sorting** - Date, Name (by displayName), Size (by size field)
+- [x] **Pagination** - `loadMore()` function with "Load More" button
+- [x] **Search** - Searches by filename, originalName, displayName, storage type
+- [x] **Lightbox** - Opens on image click, keyboard navigation (Esc, Arrow keys)
+- [x] **Bulk Actions Bar** - Shows when images selected, delete selected button
+- [x] **Display Name UI** - Pencil button to rename images
+- [x] **Checkbox Sync** - Select All syncs properly with filtered images
 
-- **Batch Integration:** Update `deleteSelectedImages()` to call the new `/batch` endpoint.
-- **Sorting:** Add `sortMode` to `AppState`. Update `getFilteredImages()` to sort by date, name, or size.
-- **Pagination:** Add `loadMore()` to fetch the next set of images and append them to `AppState.images`.
-- **Validation:** Add client-side size (200KB) and type checks before upload.
+#### UI (public/)
 
-# Task 3: Professional UI (public/index.html & styles.css)
-
-- **Lightbox Modal:** Create a hidden modal in `index.html`. Trigger it when a thumbnail is clicked (but not when clicking checkboxes). Use the proxy endpoint for the source.
-- **Control Bar:** Add a `<select>` dropdown for sorting next to the search bar.
-- **Toast System:** Implement a UI-friendly toast notification for success/error messages.
-
-# ⚠️ Constraints & Compliance
-
-- Maintain the 'AppState' pattern and use CSS Variables.
-- Use 'Optimistic UI' for batch deletions: remove cards immediately and only roll back if the server fails.
-- All code must pass ESLint and maintain storage fallback resilience.
-
-# Task 3: Professional UI (public/index.html & styles.css)
-
-- **Lightbox Modal:** Create a hidden modal in `index.html`. Trigger it when a thumbnail is clicked (but not when clicking checkboxes). Use the proxy endpoint for the source.
-- **Control Bar:** Add a `<select>` dropdown for sorting next to the search bar.
-- **Toast System:** Implement a UI-friendly toast notification for success/error messages.
-
-# ⚠️ Constraints & Compliance
-
-- Maintain the 'AppState' pattern and use CSS Variables.
-- Use 'Optimistic UI' for batch deletions: remove cards immediately and only roll back if the server fails.
-- All code must pass ESLint and maintain storage fallback resilience.
+- [x] **Lightbox Modal** - Hidden by default, shown on image click
+- [x] **Sort Dropdown** - Date, Name (A-Z), Size (Largest) options
+- [x] **Load More Button** - Only shows when hasMore is true
+- [x] **Bulk Actions Bar** - Visible when items selected
+- [x] **Image Filename Display** - Shows displayName/publicId below image
+- [x] **Rename Button** - Pencil icon to edit displayName
+- [x] **Tooltip Fix** - pointer-events added for native tooltips
 
 ---
 
-## 🏗 Key Implementation Details for Debugging
+## 🔧 Key Implementation Details
 
-### 1. Batch Deletion Performance
+### Image Schema (src/models/Image.js)
 
-The backend should be audited to ensure that `express-rate-limit` is not triggered by a single batch request containing many IDs. We will verify that the server returns a 207 Multi-Status or a summary object if some deletions fail while others succeed.
+```javascript
+{
+  filename: String,        // System-generated unique filename
+  originalName: String,    // Original filename from upload
+  displayName: String,     // Custom display name (user-editable)
+  path: String,           // Cloudinary URL or local path
+  publicId: String,       // Cloudinary public ID
+  localPath: String,      // Local file path if not on Cloudinary
+  size: Number,           // File size in bytes
+  uploadDate: Date,       // Upload timestamp
+  user_ip: String         // User IP address
+}
+```
 
-### 2. Image Proxy & Modal UX
+### API Endpoints
 
-Since Cloudinary URLs can be blocked by certain environments, the Modal must strictly use the `/images/:id/src` endpoint.
+| Method | Endpoint                  | Description                  |
+| ------ | ------------------------- | ---------------------------- |
+| GET    | `/images?page=1&limit=12` | Paginated image list         |
+| GET    | `/images/:id`             | Single image by ID           |
+| GET    | `/images/:id/src`         | Image proxy for lightbox     |
+| PATCH  | `/images/:id/displayName` | Update display name          |
+| DELETE | `/images/:id`             | Delete single image          |
+| DELETE | `/images/batch`           | Batch delete multiple images |
 
-### 3. DOM Virtualization vs. Simple Pagination
+### Search Functionality
 
-For this phase, we are using a "Load More" button to keep the `public/app.js` logic clean. In the debugging phase, we will check if appending large sets of images causes layout shifts (CLS) and if the **Skeleton Screens** effectively mask the loading state of new pages.
+Searches across:
+
+- `filename` (system-generated)
+- `originalName` (uploaded file name)
+- `displayName` (custom name)
+- Storage type (`cloudinary` / `local`)
+
+---
+
+## 🏗 Known Considerations
+
+1. **Rate Limiting:** Batch endpoint helps avoid `express-rate-limit` triggers
+2. **Image Size Field:** Now captured during upload for sorting
+3. **Lightbox Proxy:** Must use `/images/:id/src` to avoid CORS issues
+4. **Existing Images:** Pre-existing images won't have `size`/`originalName`/`displayName` until re-uploaded
+5. **Browser Cache:** Clear cache after updates to get new JS/CSS
 
 ---
 
@@ -106,3 +135,7 @@ For this phase, we are using a "Load More" button to keep the `public/app.js` lo
 - **Image Editing**: Basic cropping or rotation via Cloudinary transformation APIs.
 - **User Ownership**: Associating uploads with a `userId` for multi-user support.
 - **Folders/Tags**: Implementing a directory structure for better asset categorization.
+- **Bulk Rename**: Allow renaming multiple images at once.
+- **Image Details Modal**: Show full metadata (size, dimensions, upload date) in lightbox.
+
+---
