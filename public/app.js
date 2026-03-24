@@ -107,9 +107,13 @@ function updateInspectorSidebar(image) {
       swatch.className = 'color-swatch';
       swatch.style.backgroundColor = color;
       swatch.title = color;
-      swatch.addEventListener('click', () => {
-        navigator.clipboard.writeText(color);
-        showMessage(`Copied ${color}`, 'success', 2000);
+      swatch.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(color);
+          showMessage(`Copied ${color}`, 'success', 2000);
+        } catch (err) {
+          showMessage(`Color: ${color}`, 'success', 2000);
+        }
       });
       colorsContainer.appendChild(swatch);
     });
@@ -129,11 +133,12 @@ function updateInspectorSidebar(image) {
         document.getElementById('search-input').value = tag;
         renderGallery(getFilteredImages());
         closeLightbox();
+        showMessage(`Filtered by tag: ${tag}`, 'success', 2000);
       });
       tagsContainer.appendChild(chip);
     });
   } else {
-    tagsContainer.innerHTML = '<span class="tag-chip empty">No tags</span>';
+    tagsContainer.innerHTML = '<span class="tag-chip empty">No tags (Cloudinary premium)</span>';
   }
 
   const downloadBtn = document.getElementById('inspector-download');
@@ -147,10 +152,14 @@ function updateInspectorSidebar(image) {
     link.click();
   };
 
-  copyBtn.onclick = () => {
+  copyBtn.onclick = async () => {
     const proxyUrl = `${window.location.origin}/images/${image._id}/src`;
-    navigator.clipboard.writeText(proxyUrl);
-    showMessage('Proxy link copied!', 'success', 2000);
+    try {
+      await navigator.clipboard.writeText(proxyUrl);
+      showMessage('Proxy link copied!', 'success', 2000);
+    } catch (err) {
+      showMessage(`Link: ${proxyUrl}`, 'success', 2000);
+    }
   };
 
   renameBtn.onclick = () => {
