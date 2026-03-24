@@ -15,7 +15,9 @@ export const handleUpload = async (req, res, next) => {
 
     const image = await imageService.createImage({
       filename: req.file.filename,
+      originalName: req.file.originalname,
       localFilePath: req.file.path,
+      size: req.file.size,
       user_ip: req.ip,
     });
 
@@ -61,6 +63,26 @@ export const getImageById = async (req, res, next) => {
       return notFound(res, 'Image not found!');
     }
     return success(res, image);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const updateDisplayName = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { displayName } = req.body;
+
+    if (!displayName || typeof displayName !== 'string') {
+      return badRequest(res, 'Display name is required');
+    }
+
+    const image = await imageService.updateImageDisplayName(id, displayName.trim());
+    if (!image) {
+      return notFound(res, 'Image not found!');
+    }
+
+    return success(res, image, 'Display name updated!');
   } catch (err) {
     next(err);
   }
