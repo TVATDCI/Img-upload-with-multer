@@ -6,6 +6,25 @@ This document provides detailed technical specifications for implementing Phase 
 
 ---
 
+## ✅ Implementation Status
+
+| Feature                 | Status      | Notes                              |
+| ----------------------- | ----------- | ---------------------------------- |
+| Batch Delete Endpoint   | ✅ Complete | `DELETE /images/batch`             |
+| Pagination              | ✅ Complete | `GET /images?page=1&limit=12`      |
+| Sort by Date/Name/Size  | ✅ Complete | Dropdown with 3 options            |
+| Lightbox Modal          | ✅ Complete | Keyboard nav, proxy endpoint       |
+| Load More Button        | ✅ Complete | Shows when hasMore=true            |
+| Bulk Actions Bar        | ✅ Complete | Visible when items selected        |
+| Display Name (Rename)   | ✅ Complete | PATCH endpoint + UI                |
+| File Size Tracking      | ✅ Complete | Added to schema                    |
+| Original Name Tracking  | ✅ Complete | Added to schema                    |
+| Enhanced Search         | ✅ Complete | Searches displayName, originalName |
+| Checkbox Sync           | ✅ Complete | Select All syncs properly          |
+| Lightbox Error Handling | ✅ Complete | onerror handler added              |
+
+---
+
 ## 1. Backend Implementation (src/)
 
 ### 1.1 Batch Delete Endpoint
@@ -35,9 +54,8 @@ export const batchDeleteImages = async (req, res, next) => {
       res,
       {
         total: ids.length,
-        succeeded: results.succeeded.length,
-        failed: results.failed.length,
-        details: results.results,
+        succeeded: results.succeeded,
+        failed: results.failed,
       },
       `${results.succeeded.length} of ${ids.length} images deleted`
     );
@@ -75,7 +93,7 @@ export const batchDeleteImages = async (ids) => {
 
 **Route:** `GET /images?page=1&limit=12`
 
-**Location:** `src/routes/imageRoutes.js` - Already present, needs update
+**Location:** `src/routes/imageRoutes.js`
 
 **Controller:** `src/controllers/imageController.js`
 
@@ -119,11 +137,60 @@ export const getTotalImageCount = async () => {
 };
 ```
 
+### 1.3 Display Name Update (NEW)
+
+**Route:** `PATCH /images/:id/displayName`
+
+**Controller:**
+
+```javascript
+export const updateDisplayName = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { displayName } = req.body;
+
+    if (!displayName || typeof displayName !== 'string') {
+      return badRequest(res, 'Display name is required');
+    }
+
+    const image = await imageService.updateImageDisplayName(id, displayName.trim());
+    if (!image) {
+      return notFound(res, 'Image not found!');
+    }
+
+    return success(res, image, 'Display name updated!');
+  } catch (err) {
+    next(err);
+  }
+};
+```
+
 ---
 
-## 2. Frontend Logic (public/app.js)
+## 2. Image Schema (Updated)
 
-### 2.1 Updated AppState
+```javascript
+const imageSchema = new mongoose.Schema(
+  {
+    filename: { type: String, required: true },
+    originalName: { type: String }, // NEW: Original filename from upload
+    displayName: { type: String }, // NEW: Custom display name (user-editable)
+    path: { type: String, required: true },
+    publicId: { type: String },
+    localPath: { type: String },
+    size: { type: Number }, // NEW: File size in bytes
+    uploadDate: { type: Date, default: Date.now },
+    user_ip: { type: String, required: true },
+  },
+  { timestamps: true }
+);
+```
+
+---
+
+## 3. Frontend Logic (public/app.js)
+
+### 3.1 Updated AppState
 
 ```javascript
 const AppState = {
@@ -139,99 +206,55 @@ const AppState = {
     total: 0,
     hasMore: false,
   },
-  // Lightbox state
-  lightboxImage: null,
-  lightboxIndex: 0,
-
   setState(updates) {
     Object.assign(this, updates);
   },
 };
 ```
 
-### 2.2 Updated deleteSelectedImages()
+### 3.2 Display Name Helper (NEW)
 
 ```javascript
-async function deleteSelectedImages() {
-  const ids = [...AppState.selectedIds];
-  if (ids.length === 0) return;
-
-  if (!window.confirm(`Delete ${ids.length} selected image(s)? This cannot be undone.`)) return;
-
-  // Optimistic UI: immediately hide cards
-  const cards = ids.map((id) => document.getElementById(`img-${id}`)).filter(Boolean);
-  cards.forEach((card) => {
-    card.style.opacity = '0.5';
-    card.style.transform = 'scale(0.95)';
-  });
-
-  try {
-    const res = await fetch(`${API}images/batch`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids }),
-    });
-
-    const data = await res.json();
-
-    if (res.ok && data.data) {
-      // Remove successfully deleted images from state
-      const succeededIds = data.data.succeeded;
-      AppState.images = AppState.images.filter((img) => !succeededIds.includes(img._id));
-      AppState.selectedIds = [];
-
-      renderGallery(getFilteredImages());
-      updateBulkActionsBar();
-
-      if (data.data.failed.length > 0) {
-        showMessage(
-          `${data.data.succeeded.length} deleted, ${data.data.failed.length} failed.`,
-          'warning'
-        );
-      } else {
-        showMessage(`${succeededIds.length} image(s) deleted.`, 'success', 3000);
-      }
-    } else {
-      // Rollback: restore card visibility
-      cards.forEach((card) => {
-        card.style.opacity = '1';
-        card.style.transform = 'scale(1)';
-      });
-      showMessage(data.error || 'Batch delete failed.', 'error');
-    }
-  } catch (err) {
-    // Rollback on network error
-    cards.forEach((card) => {
-      card.style.opacity = '1';
-      card.style.transform = 'scale(1)';
-    });
-    showMessage('Network error during batch delete.', 'error');
+function getImageDisplayName(img) {
+  // Priority: displayName > publicId > originalName > filename
+  if (img.displayName) return img.displayName;
+  if (img.publicId) {
+    const parts = img.publicId.split('/');
+    return parts[parts.length - 1];
   }
+  return img.originalName || img.filename;
 }
 ```
 
-### 2.3 Sorting Implementation
+### 3.3 Search Implementation (Updated)
 
 ```javascript
 function getFilteredImages() {
   let images = AppState.images;
 
-  // Apply search filter
+  // Apply search filter - now searches displayName, originalName, filename, storage type
   const query = AppState.searchQuery.toLowerCase().trim();
   if (query) {
     images = images.filter((img) => {
       const filename = img.filename || '';
+      const originalName = img.originalName || '';
+      const displayName = getImageDisplayName(img);
       const isCloudinary = img.path && img.path.includes('cloudinary.com');
       const storageType = isCloudinary ? 'cloudinary' : 'local';
-      return filename.toLowerCase().includes(query) || storageType.includes(query);
+      return (
+        filename.toLowerCase().includes(query) ||
+        originalName.toLowerCase().includes(query) ||
+        displayName.toLowerCase().includes(query) ||
+        storageType.includes(query)
+      );
     });
   }
 
-  // Apply sorting
+  // Apply sorting - now sorts by displayName for 'name' mode
   images = [...images].sort((a, b) => {
     switch (AppState.sortMode) {
       case 'name':
-        return (a.filename || '').localeCompare(b.filename || '');
+        return getImageDisplayName(a).localeCompare(getImageDisplayName(b));
       case 'size':
         return (b.size || 0) - (a.size || 0);
       case 'date':
@@ -244,116 +267,110 @@ function getFilteredImages() {
 }
 ```
 
-### 2.4 Load More / Pagination
+### 3.4 Bulk Actions Bar (NEW)
 
 ```javascript
-async function loadMore() {
-  if (AppState.pagination.hasMore === false || AppState.isLoading) return;
+function updateBulkActionsBar() {
+  const count = AppState.selectedIds.length;
+  const bulkActionsBar = document.getElementById('bulk-actions-bar');
+  const selectedCountEl = document.getElementById('selected-count');
+  const deleteSelectedBtn = document.getElementById('delete-selected-btn');
 
-  AppState.setState({ isLoading: true });
-
-  try {
-    const nextPage = AppState.pagination.page + 1;
-    const res = await fetch(`${API}images?page=${nextPage}&limit=${AppState.pagination.limit}`);
-    const data = await res.json();
-
-    if (res.ok && data.data) {
-      AppState.setState({
-        images: [...AppState.images, ...data.data.data],
-        pagination: {
-          ...AppState.pagination,
-          page: nextPage,
-          total: data.data.pagination.total,
-          hasMore: data.data.pagination.hasMore,
-        },
-      });
-      renderGallery(getFilteredImages());
-    }
-  } catch (err) {
-    showMessage('Failed to load more images.', 'error');
-  } finally {
-    AppState.setState({ isLoading: false });
+  if (count > 0) {
+    selectedCountEl.textContent = `${count} selected`;
+    deleteSelectedBtn.style.display = 'inline-block';
+    bulkActionsBar.classList.add('visible'); // NEW: Toggle visibility class
+  } else {
+    selectedCountEl.textContent = '0 selected';
+    deleteSelectedBtn.style.display = 'none';
+    bulkActionsBar.classList.remove('visible');
   }
 }
 ```
 
-### 2.5 Lightbox Modal Implementation
+### 3.5 Lightbox with Error Handling (Updated)
 
 ```javascript
-// Lightbox state
-let lightboxVisible = false;
-let currentImageIndex = 0;
-
 function openLightbox(imageId) {
   const images = getFilteredImages();
   currentImageIndex = images.findIndex((img) => img._id === imageId);
 
-  if (currentImageIndex === -1) return;
+  if (currentImageIndex === -1) {
+    showMessage('Image not found.', 'error');
+    return;
+  }
 
   const image = images[currentImageIndex];
   const modal = document.getElementById('lightbox-modal');
   const modalImg = document.getElementById('lightbox-image');
 
+  modalImg.alt = image.filename || 'Full size image';
   modalImg.src = `/images/${image._id}/src`;
+
+  // NEW: Error handling for failed image loads
+  modalImg.onerror = () => {
+    modalImg.src = '';
+    modalImg.alt = 'Failed to load image';
+    showMessage('Failed to load image preview.', 'error');
+  };
+
   modal.style.display = 'flex';
   lightboxVisible = true;
-
-  // Prevent body scroll
   document.body.style.overflow = 'hidden';
 }
+```
 
-function closeLightbox() {
-  const modal = document.getElementById('lightbox-modal');
-  modal.style.display = 'none';
-  lightboxVisible = false;
-  document.body.style.overflow = '';
-}
+### 3.6 Rename Handler (NEW)
 
-function navigateLightbox(direction) {
-  const images = getFilteredImages();
-  currentImageIndex = (currentImageIndex + direction + images.length) % images.length;
-
-  const image = images[currentImageIndex];
-  const modalImg = document.getElementById('lightbox-image');
-  modalImg.src = `/images/${image._id}/src`;
-}
-
-// Keyboard navigation
-document.addEventListener('keydown', (e) => {
-  if (!lightboxVisible) return;
-
-  if (e.key === 'Escape') closeLightbox();
-  if (e.key === 'ArrowLeft') navigateLightbox(-1);
-  if (e.key === 'ArrowRight') navigateLightbox(1);
-});
-
-// Click handler update (exclude checkbox clicks)
+```javascript
 imageGallery.addEventListener('click', (e) => {
-  const checkbox = e.target.closest('.img-checkbox');
-  if (checkbox) return; // Skip checkbox clicks
+  const editBtn = e.target.closest('.btn-edit-name');
+  if (!editBtn) return;
 
-  const card = e.target.closest('.image-card');
-  if (card && !e.target.closest('.btn-delete')) {
-    const imageId = card.id.replace('img-', '');
-    openLightbox(imageId);
-  }
+  e.stopPropagation();
+  const id = editBtn.dataset.id;
+  const image = AppState.images.find((img) => img._id === id);
+  if (!image) return;
+
+  const currentName = getImageDisplayName(image);
+  const newName = prompt('Enter new name for this image:', currentName);
+
+  if (!newName || newName.trim() === currentName) return;
+
+  fetch(`${API}images/${id}/displayName`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ displayName: newName.trim() }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success && data.data) {
+        const idx = AppState.images.findIndex((img) => img._id === id);
+        if (idx !== -1) {
+          AppState.images[idx] = { ...AppState.images[idx], displayName: newName.trim() };
+        }
+        renderGallery(getFilteredImages());
+        showMessage('Image renamed successfully!', 'success', 3000);
+      } else {
+        showMessage(data.error || 'Failed to rename image.', 'error');
+      }
+    });
 });
 ```
 
 ---
 
-## 3. UI Components (public/index.html)
+## 4. UI Components (public/index.html)
 
-### 3.1 Added Elements
+### 4.1 Gallery Controls with Sort Options
 
 ```html
-<!-- Sort Dropdown -->
 <div class="gallery-controls">
   <input
     type="text"
     id="search-input"
     class="search-input"
-    placeholder="Search..."
+    placeholder="Search by filename or storage type..."
     aria-label="Search images"
   />
 
@@ -361,195 +378,120 @@ imageGallery.addEventListener('click', (e) => {
     <option value="date">Date (Newest)</option>
     <option value="name">Name (A-Z)</option>
     <option value="size">Size (Largest)</option>
+    <!-- NEW -->
   </select>
 
   <button id="view-toggle" class="btn-toggle">Switch to List View</button>
 </div>
+```
 
-<!-- Load More Button -->
-<div id="load-more-container" class="load-more-container">
-  <button id="load-more-btn" class="btn-load-more">Load More</button>
+### 4.2 Bulk Actions Bar (NEW)
+
+```html
+<div id="bulk-actions-bar" class="bulk-actions-bar">
+  <label class="select-all-label">
+    <input type="checkbox" id="select-all" />
+    <span id="selected-count">0 selected</span>
+  </label>
+  <button id="delete-selected-btn" class="btn-delete-selected">Delete Selected</button>
 </div>
+```
 
-<!-- Lightbox Modal -->
-<div
-  id="lightbox-modal"
-  class="lightbox-modal"
-  role="dialog"
-  aria-modal="true"
-  aria-label="Image preview"
->
-  <button id="lightbox-close" class="lightbox-close" aria-label="Close">&times;</button>
-  <button id="lightbox-prev" class="lightbox-nav lightbox-prev" aria-label="Previous image">
-    &larr;
-  </button>
-  <img id="lightbox-image" class="lightbox-image" src="" alt="Full size image" />
-  <button id="lightbox-next" class="lightbox-nav lightbox-next" aria-label="Next image">
-    &rarr;
-  </button>
+### 4.3 Image Card with Rename Button (NEW)
+
+```html
+<div class="image-card">
+  <div class="card-checkbox">
+    <input type="checkbox" class="img-checkbox" data-id="..." />
+  </div>
+  <img src="/images/.../src" alt="..." title="..." />
+  <div class="card-details">
+    <div class="image-meta">
+      <span class="image-filename" data-id="..." title="Click to rename">displayName</span>
+      <button class="btn-edit-name" data-id="..." title="Rename">✎</button>
+      <span class="badge badge-cloudinary">Cloudinary</span>
+    </div>
+    <button class="btn-delete" data-id="...">Delete</button>
+  </div>
 </div>
-
-<!-- Toast Container -->
-<div id="toast-container" class="toast-container"></div>
 ```
 
 ---
 
-## 4. Styling (public/styles.css)
+## 5. Styling (public/styles.css)
 
-### 4.1 Sort Select
-
-```css
-.sort-select {
-  padding: 8px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: 14px;
-  background: var(--color-white);
-  cursor: pointer;
-}
-
-.sort-select:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
-}
-```
-
-### 4.2 Load More Button
+### 5.1 Image Filename & Edit Button (NEW)
 
 ```css
-.load-more-container {
-  text-align: center;
-  margin: 24px 0;
-}
-
-.btn-load-more {
-  background: var(--color-primary);
-  color: var(--color-white);
-  border: none;
-  padding: 12px 32px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: 14px;
+.image-filename {
+  font-size: 12px;
+  color: var(--color-text);
   font-weight: 500;
-  transition: background var(--transition-fast);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
 }
 
-.btn-load-more:hover {
-  background: var(--color-primary-hover);
+.image-filename:hover {
+  color: var(--color-primary);
 }
 
-.btn-load-more:disabled {
-  background: #ccc;
-  cursor: not-allowed;
+.btn-edit-name {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-text-muted);
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+}
+
+.btn-edit-name:hover {
+  color: var(--color-primary);
 }
 ```
 
-### 4.3 Lightbox Modal
+### 5.2 Bulk Actions Bar (NEW)
 
 ```css
-.lightbox-modal {
+.bulk-actions-bar {
   display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.9);
-  z-index: 1000;
   align-items: center;
-  justify-content: center;
-}
-
-.lightbox-image {
-  max-width: 90%;
-  max-height: 90%;
-  object-fit: contain;
-}
-
-.lightbox-close {
-  position: absolute;
-  top: 20px;
-  right: 30px;
-  font-size: 40px;
-  color: white;
-  background: none;
-  border: none;
-  cursor: pointer;
-}
-
-.lightbox-nav {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 40px;
-  color: white;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 20px;
-}
-
-.lightbox-prev {
-  left: 20px;
-}
-.lightbox-next {
-  right: 20px;
-}
-```
-
-### 4.4 Toast Notifications
-
-```css
-.toast-container {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  z-index: 1001;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.toast {
-  padding: 14px 20px;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--color-selection);
   border-radius: var(--radius-md);
-  color: var(--color-white);
-  font-weight: 500;
-  box-shadow: var(--shadow-card);
-  animation: toast-slide-in 0.3s ease;
+  margin-bottom: 16px;
 }
 
-.toast.success {
-  background: var(--color-success);
-}
-.toast.error {
-  background: var(--color-danger);
-}
-.toast.warning {
-  background: #f59e0b;
-}
-
-@keyframes toast-slide-in {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+.bulk-actions-bar.visible {
+  display: flex;
 }
 ```
 
 ---
 
-## 5. Governance Compliance Checklist
+## 6. API Endpoints Summary
+
+| Method | Endpoint                  | Description                                            |
+| ------ | ------------------------- | ------------------------------------------------------ |
+| POST   | `/uploadImage`            | Upload image (returns size, originalName, displayName) |
+| GET    | `/images?page=1&limit=12` | Paginated list                                         |
+| GET    | `/images/:id`             | Single image                                           |
+| GET    | `/images/:id/src`         | Image proxy                                            |
+| PATCH  | `/images/:id/displayName` | Update display name (NEW)                              |
+| DELETE | `/images/:id`             | Delete single                                          |
+| DELETE | `/images/batch`           | Batch delete                                           |
+
+---
+
+## 7. Governance Compliance Checklist
 
 - [x] **No Silent Failures:** All async operations wrapped in try/catch with toast feedback
 - [x] **Self-Documenting Code:** Descriptive naming (`isProcessingBatch`, `loadMore`)
-- [x] **200KB Limit:** Client-side validation already exists in Phase 1
+- [x] **200KB Limit:** Client-side validation
 - [x] **Storage Resilience:** Cloudinary with Local Fallback maintained
 - [x] **Accessibility:** All new UI elements have aria-labels and focus states
 - [x] **Toast Notifications:** Replaces alert() system
@@ -560,38 +502,44 @@ imageGallery.addEventListener('click', (e) => {
 
 ---
 
-## 6. Implementation Order
+## 8. Known Considerations
 
-1. **Backend First:**
+1. **Rate Limiting:** Batch endpoint avoids triggering `express-rate-limit` when deleting many images
+2. **Image Size Field:** Now captured during upload for sorting by size
+3. **Lightbox Proxy:** Uses `/images/:id/src` endpoint to avoid CORS issues
+4. **Existing Images:** Pre-existing images won't have `size`/`originalName`/`displayName` until re-uploaded
+5. **Browser Cache:** Clear cache after updates to get new JS/CSS
+
+---
+
+## 9. Implementation Order (Completed)
+
+1. ✅ **Backend First:**
    - Add pagination to `getImages` (controller + service)
    - Add batch delete endpoint (route + controller + service)
+   - Add displayName field and update endpoint
 
-2. **Frontend Logic:**
+2. ✅ **Frontend Logic:**
    - Update AppState with new properties
-   - Implement sorting in `getFilteredImages()`
+   - Implement sorting in `getFilteredImages()` including displayName
    - Update `deleteSelectedImages()` for batch endpoint
    - Implement `loadMore()` for pagination
+   - Add bulk actions bar visibility toggle
+   - Add rename button handler
 
-3. **UI Components:**
-   - Add HTML elements (sort dropdown, load more, lightbox, toast container)
+3. ✅ **UI Components:**
+   - Add HTML elements (sort dropdown, load more, lightbox, bulk bar, rename button)
    - Add CSS styles
    - Wire up event listeners
 
-4. **Testing:**
-   - Test batch delete with multiple images
-   - Test pagination (load more button)
-   - Test sorting (all three modes)
-   - Test lightbox (open, close, keyboard nav)
+4. ✅ **Testing:**
+   - Batch delete with multiple images
+   - Pagination (load more button)
+   - Sorting (all three modes)
+   - Lightbox (open, close, keyboard nav)
+   - Rename functionality
+   - Search by displayName
 
 ---
 
-## 7. Known Considerations
-
-1. **Rate Limiting:** The batch endpoint should help avoid triggering `express-rate-limit` when deleting many images
-2. **Image Size Field:** The Image model doesn't currently have a `size` field. Either add it to schema or use filename as proxy for sorting
-3. **Lightbox Proxy:** Must use `/images/:id/src` endpoint to avoid CORS issues with direct Cloudinary URLs
-4. **Empty State:** When all images deleted, ensure "Empty State" message displays properly with skeleton screens
-
----
-
-_Specification created for FE-Refactor-v1.3.md Phase 2 Implementation_
+_Specification updated to reflect Phase 2 implementation as of March 2026_
