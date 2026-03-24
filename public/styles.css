@@ -297,6 +297,15 @@ h1 {
   object-fit: cover;
   border-bottom: 1px solid #e5e7eb;
   display: block;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    filter 0.2s ease;
+}
+
+.image-card img:hover {
+  filter: brightness(0.85);
+  transform: scale(1.02);
 }
 
 /* Card Details */

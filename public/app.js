@@ -24,7 +24,7 @@ const form = document.getElementById('uploadForm');
 const message = document.getElementById('message');
 const submitBtn = document.getElementById('submitBtn');
 const imageGallery = document.getElementById('image-gallery');
-const bulkActionsBar = document.getElementById('bulk-actions-bar');
+// const bulkActionsBar = document.getElementById('bulk-actions-bar');
 const searchInput = document.getElementById('search-input');
 const viewToggleBtn = document.getElementById('view-toggle');
 const selectAllCheckbox = document.getElementById('select-all');
@@ -37,7 +37,10 @@ function openLightbox(imageId) {
   const images = getFilteredImages();
   currentImageIndex = images.findIndex((img) => img._id === imageId);
 
-  if (currentImageIndex === -1) return;
+  if (currentImageIndex === -1) {
+    showMessage('Image not found.', 'error');
+    return;
+  }
 
   const image = images[currentImageIndex];
   const modal = document.getElementById('lightbox-modal');
@@ -47,6 +50,7 @@ function openLightbox(imageId) {
   modal.style.display = 'flex';
   lightboxVisible = true;
 
+  // Prevent body scroll
   document.body.style.overflow = 'hidden';
 }
 
@@ -160,7 +164,7 @@ function renderGallery(images) {
       <div class="card-checkbox">
         <input type="checkbox" class="img-checkbox" data-id="${img._id}" ${isSelected ? 'checked' : ''} />
       </div>
-      <img src="/images/${img._id}/src" alt="Uploaded image" />
+      <img src="/images/${img._id}/src" alt="Uploaded image" title="Click to preview" aria-label="Click to open full-size preview" />
       <div class="card-details">
         <div class="image-meta">${getStorageBadge(img.path)}</div>
         <button
@@ -237,7 +241,7 @@ async function loadImages() {
     renderGallery(getFilteredImages());
     updateBulkActionsBar();
     updateLoadMoreButton();
-  } catch (err) {
+  } catch (_err) {
     imageGallery.innerHTML =
       '<p class="empty-state">Failed to load images. Is the server running?</p>';
   } finally {
@@ -268,7 +272,7 @@ async function loadMore() {
       renderGallery(getFilteredImages());
       updateLoadMoreButton();
     }
-  } catch (err) {
+  } catch (_err) {
     showMessage('Failed to load more images.', 'error');
   } finally {
     AppState.setState({ isLoading: false });
@@ -481,6 +485,12 @@ if (sortSelect) {
 const loadMoreBtn = document.getElementById('load-more-btn');
 if (loadMoreBtn) {
   loadMoreBtn.addEventListener('click', loadMore);
+}
+
+// Delete selected button handler
+const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+if (deleteSelectedBtn) {
+  deleteSelectedBtn.addEventListener('click', deleteSelectedImages);
 }
 
 selectAllCheckbox.addEventListener('change', (e) => {
