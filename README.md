@@ -4,12 +4,13 @@ A production-ready Express.js image upload API with MongoDB storage and Cloudina
 
 ## 📚 Version History
 
-| Version                                                                 | Description                                             | Date     |
-| ----------------------------------------------------------------------- | ------------------------------------------------------- | -------- |
-| [v1.0](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1)       | Basic image upload with Multer + MongoDB                | Original |
-| [v1.1.x](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1.1)   | Cloudinary integration with local fallback              | Phase 1  |
-| [v1.1.3](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1.1.3) | Enterprise features: batch delete, pagination, lightbox | Phase 2  |
-| [main](https://github.com/TVATDCI/Img-upload-with-multer/tree/main)     | Advanced metadata: size, displayName, sorting           | Current  |
+| Version                                                                 | Description                                                        | Date      |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------ | --------- |
+| [v1.0](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1)       | Basic image upload with Multer + MongoDB                           | Original  |
+| [v1.1.x](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1.1)   | Cloudinary integration with local fallback                         | Phase 1   |
+| [v1.1.3](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1.1.3) | Enterprise features: batch delete, pagination, lightbox            | Phase 2   |
+| [v1.2](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1.2)     | Advanced metadata: size, displayName, sorting                      | Phase 2.1 |
+| [main](https://github.com/TVATDCI/Img-upload-with-multer/tree/main)     | Asset Inspector: dimensions, colors, AI metadata, split-view modal | Phase 3   |
 
 ---
 
@@ -22,6 +23,8 @@ A production-ready Express.js image upload API with MongoDB storage and Cloudina
 - **Helmet** — Security headers
 - **express-rate-limit** — Upload rate limiting
 - **ESLint + Prettier** — Code linting and formatting
+- **image-size** — Extract image dimensions
+- **colorthief** — Extract dominant colors
 
 ---
 
@@ -121,6 +124,9 @@ Upload an image. Supports JPEG, PNG, GIF, WebP. Max size: **200KB**.
     "originalName": "my-photo.jpg",
     "displayName": "My Vacation Photo",
     "size": 154200,
+    "dimensions": { "width": 1920, "height": 1080 },
+    "colors": ["#2E4F06", "#152E02", "#3A6604", "#8DAC30", "#7AA403", "#DBE98A"],
+    "fileType": "image/jpeg",
     "path": "https://res.cloudinary.com/.../uuid-filename.jpg",
     "publicId": "img-upload/uuid-filename",
     "localPath": null,
@@ -130,77 +136,15 @@ Upload an image. Supports JPEG, PNG, GIF, WebP. Max size: **200KB**.
 }
 ```
 
-### `GET /images?page=1&limit=12`
-
-Paginated image list with metadata.
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "message": "Success",
-  "data": {
-    "data": [...],
-    "pagination": {
-      "page": 1,
-      "limit": 12,
-      "total": 50,
-      "totalPages": 5,
-      "hasMore": true
-    }
-  }
-}
-```
-
-### `DELETE /images/batch`
-
-Batch delete multiple images in one request.
-
-**Request:**
-
-```json
-{
-  "ids": ["id1", "id2", "id3"]
-}
-```
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "message": "3 of 3 images deleted",
-  "data": {
-    "total": 3,
-    "succeeded": ["id1", "id2", "id3"],
-    "failed": []
-  }
-}
-```
-
----
-
-## Error Responses
-
-| HTTP Status | Meaning                           |
-| ----------- | --------------------------------- |
-| 400         | Bad request (no file, invalid ID) |
-| 413         | File too large (max 200KB)        |
-| 415         | Invalid file type                 |
-| 404         | Image not found                   |
-| 429         | Too many uploads (rate limited)   |
-| 500         | Server error                      |
-
 ---
 
 ## Features
 
 ### Storage
 
-- **Cloudinary** — Primary storage. Images are uploaded to Cloudinary and served via CDN.
-- **Local fallback** — If Cloudinary upload fails, the image is stored locally in `./uploads/` and served at `/uploads/filename`.
-- **`localPath` tracking** — MongoDB stores the filesystem path for local files so deletion works correctly.
+- **Cloudinary** — Primary storage. Images uploaded to cloud via CDN.
+- **Local fallback** — If Cloudinary fails, stored locally in `./uploads/`.
+- **`localPath` tracking** — MongoDB stores filesystem path for deletion.
 
 ### Security
 
@@ -209,33 +153,37 @@ Batch delete multiple images in one request.
 - Filename sanitization with UUID
 - Rate limiting: 20 uploads per 15 minutes per IP
 - Helmet security headers
-- CORS whitelist (configurable via `ALLOWED_ORIGINS`)
+- CORS whitelist
 
-### Error Handling
+### Metadata Extraction (Phase 3)
 
-- Multer errors mapped to appropriate HTTP status codes
-- Global error handler for consistent JSON responses
-- Orphaned file cleanup if database save fails
+- **Dimensions**: Width × Height extracted on upload
+- **Colors**: 6 dominant colors (hex codes) extracted automatically
+- **File Type**: MIME type stored
+- Cloudinary uploads get metadata from API
+- Local uploads get metadata via `image-size` and `colorthief`
 
 ### Frontend (`public/`)
 
 Access at **http://localhost:3001**
 
 - Fetch-based upload (no page reload)
-- Success/error messages with auto-hide (green/red toasts)
-- Loading skeleton screens while fetching images
-- Image gallery with Cloudinary/Local badge per image
-- **Delete button** with confirmation dialog
-- **Bulk delete** - Select multiple images and delete at once
-- **Search** - Filter by filename, originalName, displayName, or storage type
-- **Sort** - By Date (newest), Name (A-Z), or Size (largest)
-- **Load More** - Pagination button for large galleries
-- **Lightbox** - Click image to open full-size preview with keyboard navigation (Esc, Arrow keys)
-- **Rename** - Custom display names for images (pencil icon)
-- **Select All** - Bulk select/deselect with checkbox
-- Client-side validation: file size (max 200KB) and MIME type
-- Accessibility: `aria-label` on all interactive elements
-- Images served through `/images/:id/src` proxy (works around CDN blocking)
+- Success/error messages with auto-hide toasts
+- Loading skeleton screens
+- Image gallery with Cloudinary/Local badges
+- **Bulk delete** - Select multiple, delete at once
+- **Search** - By filename, originalName, displayName, tags, storage
+- **Sort** - By Date, Name, or Size
+- **Load More** - Pagination button
+- **Asset Inspector** - Split-view lightbox with metadata sidebar:
+  - Info: Display Name, Original Name, Upload Date
+  - Technical: Dimensions, File Size, MIME Type
+  - Colors: 6 clickable swatches (click to copy hex)
+  - Tags: Clickable chips to filter gallery
+- **Actions**: Download, Copy Proxy Link, Rename
+- **Color swatches** on gallery cards showing image colors
+- Keyboard navigation (Esc, Arrow keys)
+- Responsive design (mobile-friendly)
 
 ---
 
@@ -250,6 +198,10 @@ Access at **http://localhost:3001**
   publicId: String,       // Cloudinary public ID
   localPath: String,      // Local file path if not on Cloudinary
   size: Number,           // File size in bytes
+  dimensions: { width: Number, height: Number },
+  tags: [String],         // AI tags (Cloudinary premium)
+  colors: [String],       // 6 dominant hex colors
+  fileType: String,       // MIME type
   uploadDate: Date,       // Upload timestamp
   user_ip: String         // User IP address
 }
@@ -267,52 +219,45 @@ npm run format   # Format code with Prettier
 
 ---
 
-## Original Student Tasks (v1.0)
-
-This project started as a student exercise:
-
-1. Install npm packages: express, mongoose, multer, cors
-2. Configure Multer with `./uploads` destination and 200KB file limit
-3. Create a `/uploadImage` endpoint with Multer middleware
-4. Test basic image upload
-5. Create an Image schema with filename, path, uploadDate, user_ip
-6. Save image metadata to MongoDB on upload
-
----
-
 ## Evolution Timeline
 
 ### v1.0 - Basic Upload
 
-- Simple Express + Multer + MongoDB setup
-- Local file storage only
+- Express + Multer + MongoDB
+- Local file storage
 - Basic HTML form
 
 ### v1.1 - Cloudinary Integration
 
-- Added Cloudinary SDK integration
-- Images uploaded to cloud by default
-- Local fallback if cloud fails
-- Added security: Helmet, rate limiting, CORS
-- Modernized frontend with fetch API
+- Cloudinary SDK integration
+- Local fallback on failure
+- Security: Helmet, rate limiting, CORS
+- Modern frontend with fetch API
 
 ### v1.1.3 - Enterprise Features
 
-- Batch delete endpoint (single API call for multiple deletes)
-- Pagination (Load More button)
-- Lightbox modal for image preview
-- Keyboard navigation (Esc, Arrows)
-- Optimistic UI for better UX
+- Batch delete endpoint
+- Pagination (Load More)
+- Lightbox modal
+- Keyboard navigation
 
-### Current (main) - Advanced Metadata
+### v1.2 - Advanced Metadata
 
-- File size tracking for sorting
+- File size tracking
 - Original filename preservation
 - Custom display names (renamable)
-- Enhanced search (by display name)
-- Sort by size option
-- Bulk actions bar
-- Checkbox sync improvements
+- Sort by size
+
+### Phase 3 (Current) - Asset Inspector
+
+- **Split-view lightbox** with metadata sidebar
+- **Dimensions extraction** on upload
+- **6 dominant colors** extracted automatically
+- **Color swatches** on gallery cards
+- **Clickable tags** for filtering
+- **Download, Copy Proxy, Rename** buttons
+- Responsive design
+- Modal animations
 
 ---
 

@@ -33,46 +33,69 @@ Senior Full-Stack Engineer. Implement Phase 3: "Intelligence & Inspection."
 | Tag filtering UI | Dropdown          | Clicking tag shows dropdown with filter options                                                              |
 | Existing images  | Not updated       | Only new uploads will have metadata; existing images keep empty fields                                       |
 
-# 🛠 Technical Requirements
+---
 
-## 1. Backend: Metadata Extraction (src/)
+## ✅ Implementation Status
 
-- **Schema Update**: Enhance `Image.js` to include:
-  - `dimensions`: { width: Number, height: Number }
-  - `tags`: [String] (AI-generated labels, optional)
-  - `colors`: [String] (Array of 6 dominant Hex codes)
-  - `fileType`: String (e.g., 'image/png')
-- **Upload Controller**:
-  - Update `imageController.js` to extract width/height during upload.
-  - If using Cloudinary: Enable `colors: true` in the upload call. Skip tags for graceful degradation (premium add-on).
-  - If Local: Use `image-size` library for dimensions, `color-thief-node` for colors. Leave tags empty.
-- **Search Logic**: Update `GET /images` to allow partial matches within the `tags` array.
+### Backend (src/)
 
-## 2. Frontend: The "Inspector" Modal (public/)
+- [x] **Schema Update**: Added `dimensions`, `tags[]`, `colors[]`, `fileType` fields
+- [x] **Metadata Extraction**:
+  - Cloudinary: Gets dimensions and colors from API (`colors: true`)
+  - Local: Uses `image-size` for dimensions, `colorthief` for colors
+- [x] **Search Logic**: Updated to search tags
 
-- **Split-View Lightbox**:
-  - Update the modal in `index.html` to a two-column layout.
-  - Left Column: Image preview (using the `/images/:id/src` proxy).
-  - Right Column (Sidebar):
-    - **Info Section**: Show Display Name, Original Name, and Upload Date.
-    - **Technical Section**: Show Dimensions (px), File Size (KB/MB), and MIME type.
-    - **AI Section**: Render `tags` as clickable chips and `colors` as a row of 6 interactive swatches.
-- **Action Bar**: Add buttons to the sidebar for "Download", "Copy Proxy Link", and "Rename".
+### Frontend (public/)
 
-## 3. Frontend: Logic & Search (public/app.js)
+- [x] **Split-View Lightbox**: Two-column layout with sidebar
+- [x] **Info Section**: Display Name, Original Name, Upload Date
+- [x] **Technical Section**: Dimensions, File Size, MIME type
+- [x] **Colors Section**: 6 clickable swatches (click to copy hex)
+- [x] **Tags Section**: Clickable chips to filter gallery
+- [x] **Action Buttons**: Download, Copy Proxy Link, Rename
+- [x] **Color Swatches on Cards**: 6 small dots showing image colors
+- [x] **Tag Filtering**: Click tag to filter gallery
+- [x] **Modal Animation**: Scale + Fade entrance
+- [x] **Responsive**: Sidebar below image on mobile
 
-- **Tag Filtering**: Implement a function where clicking an AI tag chip shows a dropdown to filter the gallery by that tag.
-- **Dynamic Swatches**: Render 6 small color circles on the main gallery cards to show the "vibe" of the image before opening it.
+---
 
-# 🎨 UI/UX Specifications
+## 🔧 Technical Details
 
-- **Modal Transitions**: Use a smooth "Scale + Fade" entrance for the Lightbox.
-- **Sidebar Styling**: Use a slightly darker, semi-transparent background (`backdrop-filter: blur`) for the Inspector sidebar to distinguish it from the preview.
-- **Responsiveness**: On mobile, move the Sidebar metadata _below_ the image preview.
+### New Dependencies
 
-# ⚠️ Constraints
+- `image-size` - Extract image dimensions from local files
+- `colorthief` - Extract dominant colors from images
 
-- Maintain the 'AppState' pattern for tracking the "active" image in the modal.
-- Use existing CSS variables for all colors and spacing.
-- Ensure 'Optimistic UI' principles apply if the user renames the image from the inspector.
-- Only new uploads get metadata; existing images keep empty/null fields gracefully.
+### Image Schema
+
+```javascript
+{
+  dimensions: { width: Number, height: Number },
+  tags: [String],
+  colors: [String],  // 6 hex codes
+  fileType: String
+}
+```
+
+### API Changes
+
+- `POST /uploadImage` now returns `dimensions`, `colors`, `fileType` in response
+
+---
+
+## ⚠️ Constraints (Met)
+
+- ✅ Maintained 'AppState' pattern
+- ✅ Used existing CSS variables
+- ✅ Optimistic UI for rename
+- ✅ Graceful fallback for existing images
+
+---
+
+## Future Enhancements (Phase 4)
+
+- TensorFlow.js for local AI tagging
+- Cloudinary premium auto-tagging
+- Color-based filtering UI
+- Image editing (crop, rotate)
