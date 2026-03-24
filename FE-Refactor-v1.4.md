@@ -24,19 +24,28 @@ Senior Full-Stack Engineer. Implement Phase 3: "Intelligence & Inspection."
 2. Asset Inspector: A professional split-view Lightbox with a technical metadata sidebar.
 3. Smart Filtering: Search and filter by AI tags and hex color codes.
 
+## 📋 Decisions Made
+
+| Decision         | Choice            | Notes                                                                                                        |
+| ---------------- | ----------------- | ------------------------------------------------------------------------------------------------------------ |
+| AI Tags          | Graceful fallback | Only enable tags for Cloudinary uploads; skip for local fallback; leave field empty/null for existing images |
+| Color count      | 6                 | Extract 6 dominant colors per image                                                                          |
+| Tag filtering UI | Dropdown          | Clicking tag shows dropdown with filter options                                                              |
+| Existing images  | Not updated       | Only new uploads will have metadata; existing images keep empty fields                                       |
+
 # 🛠 Technical Requirements
 
 ## 1. Backend: Metadata Extraction (src/)
 
 - **Schema Update**: Enhance `Image.js` to include:
   - `dimensions`: { width: Number, height: Number }
-  - `tags`: [String] (AI-generated labels)
-  - `colors`: [String] (Array of dominant Hex codes)
+  - `tags`: [String] (AI-generated labels, optional)
+  - `colors`: [String] (Array of 6 dominant Hex codes)
   - `fileType`: String (e.g., 'image/png')
 - **Upload Controller**:
   - Update `imageController.js` to extract width/height during upload.
-  - If using Cloudinary: Enable `colors: true` and `detection: 'captioning'` (or similar) in the upload call.
-  - If Local: Use a library like `image-size` and a basic color-thief utility to populate metadata.
+  - If using Cloudinary: Enable `colors: true` in the upload call. Skip tags for graceful degradation (premium add-on).
+  - If Local: Use `image-size` library for dimensions, `color-thief-node` for colors. Leave tags empty.
 - **Search Logic**: Update `GET /images` to allow partial matches within the `tags` array.
 
 ## 2. Frontend: The "Inspector" Modal (public/)
@@ -47,13 +56,13 @@ Senior Full-Stack Engineer. Implement Phase 3: "Intelligence & Inspection."
   - Right Column (Sidebar):
     - **Info Section**: Show Display Name, Original Name, and Upload Date.
     - **Technical Section**: Show Dimensions (px), File Size (KB/MB), and MIME type.
-    - **AI Section**: Render `tags` as clickable chips and `colors` as a row of interactive swatches.
+    - **AI Section**: Render `tags` as clickable chips and `colors` as a row of 6 interactive swatches.
 - **Action Bar**: Add buttons to the sidebar for "Download", "Copy Proxy Link", and "Rename".
 
 ## 3. Frontend: Logic & Search (public/app.js)
 
-- **Tag Filtering**: Implement a function where clicking an AI tag chip automatically filters the main gallery by that tag.
-- **Dynamic Swatches**: Render small color circles on the main gallery cards to show the "vibe" of the image before opening it.
+- **Tag Filtering**: Implement a function where clicking an AI tag chip shows a dropdown to filter the gallery by that tag.
+- **Dynamic Swatches**: Render 6 small color circles on the main gallery cards to show the "vibe" of the image before opening it.
 
 # 🎨 UI/UX Specifications
 
@@ -66,3 +75,4 @@ Senior Full-Stack Engineer. Implement Phase 3: "Intelligence & Inspection."
 - Maintain the 'AppState' pattern for tracking the "active" image in the modal.
 - Use existing CSS variables for all colors and spacing.
 - Ensure 'Optimistic UI' principles apply if the user renames the image from the inspector.
+- Only new uploads get metadata; existing images keep empty/null fields gracefully.
