@@ -1,65 +1,85 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
+  <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Image Upload from public folder</title>
     <link rel="stylesheet" href="/styles.css" />
-</head>
+  </head>
 
-<body>
+  <body>
     <h1>Upload an Image on the public folder</h1>
 
     <div id="message"></div>
 
     <div class="upload-box">
-        <form id="uploadForm">
-            <input type="file" id="image" name="image" accept="image/*" required
-                aria-label="Select an image to upload" />
-            <div id="fileName" class="file-name"></div>
-            <button type="submit" id="submitBtn">Upload</button>
-        </form>
+      <form id="uploadForm">
+        <input
+          type="file"
+          id="image"
+          name="image"
+          accept="image/*"
+          required
+          aria-label="Select an image to upload"
+        />
+        <div id="fileName" class="file-name"></div>
+        <button type="submit" id="submitBtn">Upload</button>
+      </form>
     </div>
 
     <div class="gallery">
-        <div class="gallery-header">
-            <h2>Uploaded Images</h2>
-            <div class="gallery-controls">
-                <input type="text" id="search-input" class="search-input"
-                    placeholder="Search by filename or storage type..." aria-label="Search images" />
-                <select id="sort-select" class="sort-select" aria-label="Sort images">
-                    <option value="date">Date (Newest)</option>
-                    <option value="name">Name (A-Z)</option>
-                </select>
-                <button id="view-toggle" class="btn-toggle">Switch to List View</button>
-            </div>
+      <div class="gallery-header">
+        <h2>Uploaded Images</h2>
+        <div class="gallery-controls">
+          <input
+            type="text"
+            id="search-input"
+            class="search-input"
+            placeholder="Search by filename or storage type..."
+            aria-label="Search images"
+          />
+          <select id="sort-select" class="sort-select" aria-label="Sort images">
+            <option value="date">Date (Newest)</option>
+            <option value="name">Name (A-Z)</option>
+            <option value="size">Size (Largest)</option>
+          </select>
+          <button id="view-toggle" class="btn-toggle">Switch to List View</button>
         </div>
+      </div>
 
-        <div id="bulk-actions-bar" class="bulk-actions-bar">
-            <label class="select-all-label">
-                <input type="checkbox" id="select-all" />
-                <span id="selected-count">0 selected</span>
-            </label>
-            <button id="delete-selected-btn" class="btn-delete-selected">Delete Selected</button>
-        </div>
+      <div id="bulk-actions-bar" class="bulk-actions-bar">
+        <label class="select-all-label">
+          <input type="checkbox" id="select-all" />
+          <span id="selected-count">0 selected</span>
+        </label>
+        <button id="delete-selected-btn" class="btn-delete-selected">Delete Selected</button>
+      </div>
 
-        <div id="image-gallery"></div>
+      <div id="image-gallery"></div>
 
-        <div id="load-more-container" class="load-more-container">
-            <button id="load-more-btn" class="btn-load-more">Load More</button>
-        </div>
+      <div id="load-more-container" class="load-more-container">
+        <button id="load-more-btn" class="btn-load-more">Load More</button>
+      </div>
     </div>
 
     <!-- Lightbox Modal -->
-    <div id="lightbox-modal" class="lightbox-modal" role="dialog" aria-modal="true" aria-label="Image preview">
-        <button id="lightbox-close" class="lightbox-close" aria-label="Close">&times;</button>
-        <button id="lightbox-prev" class="lightbox-nav lightbox-prev" aria-label="Previous image">&larr;</button>
-        <img id="lightbox-image" class="lightbox-image" src="" alt="Full size image" />
-        <button id="lightbox-next" class="lightbox-nav lightbox-next" aria-label="Next image">&rarr;</button>
+    <div
+      id="lightbox-modal"
+      class="lightbox-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Image preview"
+    >
+      <button id="lightbox-close" class="lightbox-close" aria-label="Close">&times;</button>
+      <button id="lightbox-prev" class="lightbox-nav lightbox-prev" aria-label="Previous image">
+        &larr;
+      </button>
+      <img id="lightbox-image" class="lightbox-image" src="" alt="Full size image" />
+      <button id="lightbox-next" class="lightbox-nav lightbox-next" aria-label="Next image">
+        &rarr;
+      </button>
     </div>
 
     <script src="/app.js"></script>
-</body>
-
+  </body>
 </html>
