@@ -298,15 +298,20 @@ h1 {
   border-bottom: 1px solid #e5e7eb;
   display: block;
   cursor: pointer;
+  pointer-events: auto;
   transition:
     transform 0.2s ease,
     filter 0.2s ease;
 }
 
-.image-card img:hover {
+.image-card img[title] {
+  title: attr(title);
+}
+
+/* .image-card img:hover {
   filter: brightness(0.85);
   transform: scale(1.02);
-}
+} */
 
 /* Card Details */
 .card-details {
@@ -323,6 +328,36 @@ h1 {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.image-filename {
+  font-size: 12px;
+  color: var(--color-text);
+  font-weight: 500;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.image-filename:hover {
+  color: var(--color-primary);
+}
+
+.btn-edit-name {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-text-muted);
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast);
+}
+
+.btn-edit-name:hover {
+  color: var(--color-primary);
 }
 
 .badge {
