@@ -1,8 +1,9 @@
 import Image from '../models/Image.js';
 import { uploadToCloudinary, deleteFromCloudinary } from './cloudinaryService.js';
 import { deleteFile } from '../utils/fileUtils.js';
-import { imageSizeFromFile } from 'image-size';
+import { imageSize } from 'image-size';
 import { getPalette } from 'colorthief';
+import fs from 'fs';
 
 async function extractLocalMetadata(localFilePath) {
   const metadata = {
@@ -12,7 +13,8 @@ async function extractLocalMetadata(localFilePath) {
   };
 
   try {
-    const dimensions = imageSizeFromFile(localFilePath);
+    const buffer = fs.readFileSync(localFilePath);
+    const dimensions = imageSize(buffer);
     if (dimensions) {
       metadata.dimensions = {
         width: dimensions.width,
