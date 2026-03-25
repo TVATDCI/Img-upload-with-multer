@@ -4,14 +4,15 @@ A production-ready Express.js image upload API with MongoDB storage and Cloudina
 
 ## 📚 Version History
 
-| Version                                                                 | Description                                                        | Date      |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------ | --------- |
-| [v1.0](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1)       | Basic image upload with Multer + MongoDB                           | Original  |
-| [v1.1.x](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1.1)   | Cloudinary integration with local fallback                         | Phase 1   |
-| [v1.1.3](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1.1.3) | Enterprise features: batch delete, pagination, lightbox            | Phase 2   |
-| [v1.2](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1.2)     | Advanced metadata: size, displayName, sorting                      | Phase 2.1 |
-| [v1.3](https://github.com/TVATDCI/Img-upload-with-multer/tree/main)     | Asset Inspector: dimensions, colors, AI metadata, split-view modal | Phase 3   |
-| **v1.4 (Current)**                                                      | **Admin Authorization: JWT, RBAC, Secure Cookies, Portfolio Mode** | **Phase 4**   |
+| Version                                                                 | Description                                                        | Date         |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------ |
+| [v1.0](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1)       | Basic image upload with Multer + MongoDB                           | Original     |
+| [v1.1.x](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1.1)   | Cloudinary integration with local fallback                         | Phase 1      |
+| [v1.1.3](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1.1.3) | Enterprise features: batch delete, pagination, lightbox            | Phase 2      |
+| [v1.2](https://github.com/TVATDCI/Img-upload-with-multer/tree/v1.2)     | Advanced metadata: size, displayName, sorting                      | Phase 2.1    |
+| [v1.3](https://github.com/TVATDCI/Img-upload-with-multer/tree/main)     | Asset Inspector: dimensions, colors, AI metadata, split-view modal | Phase 3      |
+| **v1.4 (Current)**                                                      | **Admin Authorization: JWT, RBAC, Secure Cookies, Portfolio Mode** | **Phase 4**  |
+| **v1.4.1 (Hotfix)**                                                     | **Security: Rate limiting on auth, JWT/cookie sync, logout UX**    | **Mar 2026** |
 
 ---
 
@@ -92,16 +93,17 @@ npm install
 cp .env.example .env
 ```
 
-| Variable                | Description                                   |
-| ----------------------- | --------------------------------------------- |
-| `MONGO_URI`             | MongoDB connection string (local or Atlas)    |
-| `PORT`                  | Server port (default: 3001)                   |
-| `JWT_SECRET`            | Secret key for signing tokens                 |
-| `ADMIN_EMAIL`           | Initial admin email                           |
-| `ADMIN_PASSWORD`        | Initial admin password                        |
-| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name                         |
-| `CLOUDINARY_API_KEY`    | Cloudinary API key                            |
-| `CLOUDINARY_API_SECRET` | Cloudinary API secret                         |
+| Variable                | Description                                |
+| ----------------------- | ------------------------------------------ |
+| `MONGO_URI`             | MongoDB connection string (local or Atlas) |
+| `PORT`                  | Server port (default: 3001)                |
+| `JWT_SECRET`            | Secret key for signing tokens              |
+| `JWT_EXPIRES_IN`        | JWT expiration (e.g., '7d', '24h', '1h')   |
+| `ADMIN_EMAIL`           | Initial admin email                        |
+| `ADMIN_PASSWORD`        | Initial admin password                     |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary cloud name                      |
+| `CLOUDINARY_API_KEY`    | Cloudinary API key                         |
+| `CLOUDINARY_API_SECRET` | Cloudinary API secret                      |
 
 ### 3. Seed Admin User
 
@@ -135,11 +137,13 @@ npm start
 ## Features
 
 ### Role-Based Access Control (RBAC)
+
 - **Portfolio Mode**: All admin buttons (Upload, Delete, Rename) remain visible for demonstration purposes.
 - **Secure Interaction**: Attempting an admin action as a guest triggers a "Passive Intercept" which displays an "Unauthorized" Toast with a login link.
 - **JWT Storage**: Tokens are stored in `httpOnly` cookies with `SameSite: Strict` to prevent XSS and CSRF attacks.
 
 ### Metadata Intelligence
+
 - **Dimensions**: Width × Height extracted on upload.
 - **Colors**: 6 dominant colors extracted automatically (via Sharp + Colorthief).
 - **Asset Inspector**: Professional split-view lightbox with technical metadata sidebar.

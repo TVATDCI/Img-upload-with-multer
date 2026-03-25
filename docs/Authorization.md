@@ -26,22 +26,25 @@
 ## 🏗 Step 2: Backend Implementation (src/)
 
 ### 2.1 User Model (`src/models/User.js`)
-- **Status**: ✅ Complete. 
+
+- **Status**: ✅ Complete.
 - **Details**: Uses `pre-save` async hook for `bcryptjs` hashing (Cost factor: 12).
 
 ### 2.2 Auth Middleware (`src/middlewares/auth.js`)
-- **Status**: ✅ Complete. 
-- **Guards**: 
-    - `protect`: Verifies JWT from cookie. 
-    - `restrictTo('admin')`: Rejects non-admin attempts with `403 Forbidden`.
+
+- **Status**: ✅ Complete.
+- **Guards**:
+  - `protect`: Verifies JWT from cookie.
+  - `restrictTo('admin')`: Rejects non-admin attempts with `403 Forbidden`.
 
 ### 2.3 Route Protection (`src/routes/imageRoutes.js`)
-- **Status**: ✅ Complete. 
-- **Protected Routes**: 
-    - `POST /uploadImage`
-    - `PATCH /images/:id/displayName`
-    - `DELETE /images/:id`
-    - `DELETE /images/batch`
+
+- **Status**: ✅ Complete.
+- **Protected Routes**:
+  - `POST /uploadImage`
+  - `PATCH /images/:id/displayName`
+  - `DELETE /images/:id`
+  - `DELETE /images/batch`
 
 ---
 
@@ -60,25 +63,32 @@
 **Status**: ✅ Complete.
 
 **Usage**:
+
 ```bash
 node scripts/seedAdmin.js
 ```
+
 This script handles both the creation of a new admin and the resetting of passwords for existing admin accounts.
 
 ---
 
 ## 📜 Security Mandates (Met)
+
 1.  **No Password Leakage**: `select: false` enforced in schema.
 2.  **Cookie Security**: `httpOnly: true` and `SameSite: Strict` configured in `authController.js`.
 3.  **CSP Compliance**: Inline scripts removed in favor of external files for the login portal.
 4.  **Route Order**: Batch delete route reordered to prevent ID conflicts.
+5.  **Rate Limiting**: Login endpoint protected with `express-rate-limit` (5 attempts/15min).
+6.  **JWT/Cookie Sync**: Cookie expiration dynamically parsed from `JWT_EXPIRES_IN` env variable.
 
 ---
 
 ## 🧪 Testing Protocol (Verified)
+
 1.  **Guest Experience**: Users can view the gallery, open the Asset Inspector, and see management buttons. Clicking "Delete" triggers the "Admin required" Toast.
 2.  **Admin Experience**: Logging in enables all management features.
-3.  **Logout Experience**: Session cleared, UI reverts to guest state.
+3.  **Logout Experience**: Session cleared with confirmation message, UI reverts to guest state.
 
 ---
-*Implementation Finalized: March 24, 2026*
+
+_Implementation Finalized: March 25, 2026_
