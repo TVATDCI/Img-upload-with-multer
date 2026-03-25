@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Login | Asset Manager</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .login-container {
+        max-width: 400px;
+        margin: 100px auto;
+        padding: 2rem;
+        background: var(--color-white);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-card-hover);
+        border: 1px solid var(--color-border);
+      }
+      .form-group {
+        margin-bottom: 1.5rem;
+      }
+      .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: var(--color-text-muted);
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .form-group input {
+        width: 100%;
+        padding: 12px;
+        background: var(--color-bg-light);
+        border: 1px solid var(--color-border);
+        color: var(--color-text);
+        border-radius: var(--radius-md);
+        font-size: 14px;
+        transition: border-color var(--transition-fast);
+      }
+      .form-group input:focus {
+        outline: none;
+        border-color: var(--color-primary);
+      }
+      .btn-login {
+        width: 100%;
+        padding: 12px;
+        background: var(--color-primary);
+        color: white;
+        border: none;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 14px;
+        transition: background var(--transition-fast);
+      }
+      .btn-login:hover {
+        background: var(--color-primary-hover);
+      }
+      .login-header {
+        text-align: center;
+        margin-bottom: 2rem;
+      }
+      .login-header h2 {
+        margin: 0 0 8px 0;
+        color: var(--color-text);
+      }
+      .login-header p {
+        margin: 0;
+        color: var(--color-text-muted);
+        font-size: 14px;
+      }
+      #login-message {
+        margin-top: 1rem;
+        text-align: center;
+        font-size: 13px;
+        min-height: 20px;
+      }
+      .back-link {
+        display: block;
+        text-align: center;
+        margin-top: 1.5rem;
+        color: var(--color-primary);
+        text-decoration: none;
+        font-size: 14px;
+      }
+      .back-link:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="login-container">
+      <div class="login-header">
+        <h2>Admin Login</h2>
+        <p>Access management tools</p>
+      </div>
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" required placeholder="admin@example.com" />
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" required placeholder="••••••••" />
+        </div>
+        <button type="submit" class="btn-login">Login to Dashboard</button>
+      </form>
+      <p id="login-message"></p>
+      <a href="/" class="back-link">&larr; Back to Gallery</a>
+    </div>
+
+    <!-- Externalized Script for CSP Compliance -->
+    <script src="login.js"></script>
+  </body>
+</html>
