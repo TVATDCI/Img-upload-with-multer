@@ -85,8 +85,19 @@ function updateLoginUI(isLoggedIn, email = '') {
       <button id="logout-btn" class="btn-toggle" style="margin-left: 10px; padding: 4px 10px;">Logout</button>
     `;
     document.getElementById('logout-btn').onclick = async () => {
-      await fetch('/auth/logout', { method: 'POST' });
-      window.location.reload();
+      try {
+        const res = await fetch('/auth/logout', { method: 'POST' });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          showMessage('Logged out successfully.', 'success', 2000);
+          setTimeout(() => window.location.reload(), 1000);
+        } else {
+          showMessage(data.error || 'Logout failed.', 'error');
+        }
+      } catch (err) {
+        showMessage('Logout failed. Please try again.', 'error');
+      }
     };
   } else {
     authContainer.innerHTML = `

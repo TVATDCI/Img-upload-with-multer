@@ -3,23 +3,39 @@ import User from '../models/User.js';
 import { success, badRequest, unauthorized, error } from '../utils/responseHelper.js';
 import { env } from '../config/index.js';
 
-/**
- * Signs a JWT token with the user's ID.
- */
+const parseJwtExpiresIn = (expiresIn) => {
+  const match = expiresIn.match(/^(\d+)([dhms])$/);
+  if (!match) return 7 * 24 * 60 * 60 * 1000;
+
+  const value = parseInt(match[1], 10);
+  const unit = match[2];
+
+  switch (unit) {
+    case 'd':
+      return value * 24 * 60 * 60 * 1000;
+    case 'h':
+      return value * 60 * 60 * 1000;
+    case 'm':
+      return value * 60 * 1000;
+    case 's':
+      return value * 1000;
+    default:
+      return 7 * 24 * 60 * 60 * 1000;
+  }
+};
+
 const signToken = (id) => {
   return jwt.sign({ id }, env.jwt.secret, {
     expiresIn: env.jwt.expiresIn,
   });
 };
 
-/**
- * Sends a JWT token to the client via a secure httpOnly cookie.
- */
 const createSendToken = (user, statusCode, res) => {
   const token = signToken(user._id);
+  const jwtDuration = parseJwtExpiresIn(env.jwt.expiresIn);
 
   const cookieOptions = {
-    expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days (Sync with JWT expiration if possible)
+    expires: new Date(Date.now() + jwtDuration),
     httpOnly: true,
     secure: env.nodeEnv === 'production',
     sameSite: 'Strict',
