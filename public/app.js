@@ -7,6 +7,7 @@ const AppState = {
   viewMode: 'grid',
   searchQuery: '',
   sortMode: 'date',
+  userRole: 'guest', // 'guest' | 'admin'
   pagination: {
     page: 1,
     limit: 12,
@@ -24,7 +25,6 @@ const form = document.getElementById('uploadForm');
 const message = document.getElementById('message');
 const submitBtn = document.getElementById('submitBtn');
 const imageGallery = document.getElementById('image-gallery');
-// const bulkActionsBar = document.getElementById('bulk-actions-bar');
 const searchInput = document.getElementById('search-input');
 const viewToggleBtn = document.getElementById('view-toggle');
 const selectAllCheckbox = document.getElementById('select-all');
@@ -32,6 +32,68 @@ const selectAllCheckbox = document.getElementById('select-all');
 // Lightbox state
 let lightboxVisible = false;
 let currentImageIndex = 0;
+
+/**
+ * Helper to handle 401/403 unauthorized responses globally.
+ */
+async function handleAuthError(res) {
+  if (res.status === 401 || res.status === 403) {
+    const data = await res.json().catch(() => ({}));
+    const errorMsg =
+      data.error ||
+      '⚠️ Admin access required. Please <a href="/login.html" style="color:white; text-decoration:underline;">login here</a> to manage assets.';
+    showMessage(errorMsg, 'error', 10000); // Show for longer
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Check if user is currently logged in as admin.
+ */
+async function checkAuthStatus() {
+  try {
+    const res = await fetch('/auth/getMe');
+    const data = await res.json();
+    if (res.ok && data.success && data.data?.user?.role === 'admin') {
+      AppState.userRole = 'admin';
+      updateLoginUI(true, data.data.user.email);
+    } else {
+      AppState.userRole = 'guest';
+      updateLoginUI(false);
+    }
+  } catch (_err) {
+    AppState.userRole = 'guest';
+    updateLoginUI(false);
+  }
+}
+
+function updateLoginUI(isLoggedIn, email = '') {
+  let authContainer = document.getElementById('auth-status-container');
+  if (!authContainer) {
+    authContainer = document.createElement('div');
+    authContainer.id = 'auth-status-container';
+    authContainer.style.textAlign = 'right';
+    authContainer.style.marginBottom = '10px';
+    authContainer.style.fontSize = '13px';
+    document.body.prepend(authContainer);
+  }
+
+  if (isLoggedIn) {
+    authContainer.innerHTML = `
+      <span style="color: var(--color-text-muted)">Logged in as <strong>${email}</strong></span>
+      <button id="logout-btn" class="btn-toggle" style="margin-left: 10px; padding: 4px 10px;">Logout</button>
+    `;
+    document.getElementById('logout-btn').onclick = async () => {
+      await fetch('/auth/logout', { method: 'POST' });
+      window.location.reload();
+    };
+  } else {
+    authContainer.innerHTML = `
+      <a href="/login.html" class="btn-toggle" style="text-decoration: none; display: inline-block;">Admin Login</a>
+    `;
+  }
+}
 
 function openLightbox(imageId) {
   const images = getFilteredImages();
@@ -206,7 +268,7 @@ function getImageDisplayName(img) {
 
 function showMessage(text, type, duration = 5000) {
   if (hideTimer) clearTimeout(hideTimer);
-  message.textContent = text;
+  message.innerHTML = text; // Changed to innerHTML to support links
   message.className = `${type} show`;
   hideTimer = setTimeout(() => {
     message.className = type;
@@ -376,6 +438,8 @@ async function loadImages() {
   });
   renderSkeletons(8);
 
+  await checkAuthStatus();
+
   try {
     const res = await fetch(`${API}images?page=1&limit=12`);
     const data = await res.json();
@@ -440,44 +504,51 @@ function updateLoadMoreButton() {
   }
 }
 
-function optimisticDelete(card, id) {
+async function optimisticDelete(card, id) {
   const originalCard = card.cloneNode(true);
   card.style.opacity = '0.5';
   card.style.transform = 'scale(0.95)';
 
-  return fetch(`${API}images/${id}`, { method: 'DELETE' })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.success || res.status === 404) {
-        card.remove();
-        AppState.images = AppState.images.filter((img) => img._id !== id);
-        AppState.selectedIds = AppState.selectedIds.filter((sid) => sid !== id);
+  try {
+    const res = await fetch(`${API}images/${id}`, { method: 'DELETE' });
 
-        if (AppState.images.length === 0) {
-          renderGallery([]);
-        }
-        showMessage('Image deleted.', 'success', 3000);
-        return true;
-      } else {
-        card.replaceWith(originalCard);
-        showMessage(data.error || 'Delete failed.', 'error');
-        return false;
-      }
-    })
-    .catch(() => {
+    if (await handleAuthError(res)) {
       card.replaceWith(originalCard);
-      showMessage('Network error.', 'error');
       return false;
-    });
+    }
+
+    const data = await res.json();
+
+    if (data.success || res.status === 404) {
+      card.remove();
+      AppState.images = AppState.images.filter((img) => img._id !== id);
+      AppState.selectedIds = AppState.selectedIds.filter((sid) => sid !== id);
+
+      if (AppState.images.length === 0) {
+        renderGallery([]);
+      }
+      showMessage('Image deleted.', 'success', 3000);
+      return true;
+    } else {
+      card.replaceWith(originalCard);
+      showMessage(data.error || 'Delete failed.', 'error');
+      return false;
+    }
+  } catch (_err) {
+    card.replaceWith(originalCard);
+    showMessage('Network error.', 'error');
+    return false;
+  }
 }
 
-function deleteSelectedImages() {
+async function deleteSelectedImages() {
   const ids = [...AppState.selectedIds];
   if (ids.length === 0) return;
 
   if (!window.confirm(`Delete ${ids.length} selected image(s)? This cannot be undone.`)) return;
 
   const deleteSelectedBtn = document.getElementById('delete-selected-btn');
+  const originalText = deleteSelectedBtn.textContent;
   deleteSelectedBtn.disabled = true;
   deleteSelectedBtn.textContent = 'Deleting...';
 
@@ -489,52 +560,62 @@ function deleteSelectedImages() {
     card.style.transform = 'scale(0.95)';
   });
 
-  fetch(`${API}images/batch`, {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ids }),
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.success && data.data) {
-        const succeededIds = data.data.succeeded;
+  try {
+    const res = await fetch(`${API}images/batch`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    });
 
-        // Remove successfully deleted images from state
-        AppState.images = AppState.images.filter((img) => !succeededIds.includes(img._id));
-        AppState.selectedIds = [];
-
-        renderGallery(getFilteredImages());
-        updateBulkActionsBar();
-
-        if (data.data.failed && data.data.failed.length > 0) {
-          showMessage(
-            `${data.data.succeeded.length} deleted, ${data.data.failed.length} failed.`,
-            'error'
-          );
-        } else {
-          showMessage(`${succeededIds.length} image(s) deleted.`, 'success', 3000);
-        }
-      } else {
-        // Rollback: restore card visibility
-        cards.forEach((card) => {
-          card.style.opacity = '1';
-          card.style.transform = 'scale(1)';
-        });
-        showMessage(data.error || 'Batch delete failed.', 'error');
-      }
-    })
-    .catch(() => {
-      // Rollback on network error
+    if (await handleAuthError(res)) {
       cards.forEach((card) => {
         card.style.opacity = '1';
         card.style.transform = 'scale(1)';
       });
-      showMessage('Network error during batch delete.', 'error');
-    })
-    .finally(() => {
       deleteSelectedBtn.disabled = false;
-      deleteSelectedBtn.textContent = 'Delete Selected';
+      deleteSelectedBtn.textContent = originalText;
+      return;
+    }
+
+    const data = await res.json();
+
+    if (data.success && data.data) {
+      const succeededIds = data.data.succeeded;
+
+      // Remove successfully deleted images from state
+      AppState.images = AppState.images.filter((img) => !succeededIds.includes(img._id));
+      AppState.selectedIds = [];
+
+      renderGallery(getFilteredImages());
+      updateBulkActionsBar();
+
+      if (data.data.failed && data.data.failed.length > 0) {
+        showMessage(
+          `${data.data.succeeded.length} deleted, ${data.data.failed.length} failed.`,
+          'error'
+        );
+      } else {
+        showMessage(`${succeededIds.length} image(s) deleted.`, 'success', 3000);
+      }
+    } else {
+      // Rollback: restore card visibility
+      cards.forEach((card) => {
+        card.style.opacity = '1';
+        card.style.transform = 'scale(1)';
+      });
+      showMessage(data.error || 'Batch delete failed.', 'error');
+    }
+  } catch (_err) {
+    // Rollback on network error
+    cards.forEach((card) => {
+      card.style.opacity = '1';
+      card.style.transform = 'scale(1)';
     });
+    showMessage('Network error during batch delete.', 'error');
+  } finally {
+    deleteSelectedBtn.disabled = false;
+    deleteSelectedBtn.textContent = originalText;
+  }
 }
 
 fileInput.addEventListener('change', () => {
@@ -567,7 +648,7 @@ fileInput.addEventListener('change', () => {
   submitBtn.disabled = false;
 });
 
-form.addEventListener('submit', (e) => {
+form.addEventListener('submit', async (e) => {
   e.preventDefault();
 
   if (!fileInput.files[0]) {
@@ -575,49 +656,57 @@ form.addEventListener('submit', (e) => {
     return;
   }
 
+  const originalBtnText = submitBtn.textContent;
   submitBtn.disabled = true;
   submitBtn.textContent = 'Uploading...';
 
   const formData = new FormData();
   formData.append('image', fileInput.files[0]);
 
-  fetch(`${API}uploadImage`, {
-    method: 'POST',
-    body: formData,
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.success) {
-        showMessage('Image uploaded successfully!', 'success');
-        fileNameEl.textContent = '';
-        form.reset();
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Upload';
-
-        if (data.data) {
-          AppState.images = [data.data, ...AppState.images];
-          AppState.pagination = {
-            page: 1,
-            limit: 12,
-            total: AppState.pagination.total + 1,
-            hasMore: false,
-          };
-          renderGallery(getFilteredImages());
-          updateLoadMoreButton();
-        } else {
-          loadImages();
-        }
-      } else {
-        showMessage(data.error || 'Upload failed.', 'error');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Upload';
-      }
-    })
-    .catch(() => {
-      showMessage('Network error. Is the server running?', 'error');
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Upload';
+  try {
+    const res = await fetch(`${API}uploadImage`, {
+      method: 'POST',
+      body: formData,
     });
+
+    if (await handleAuthError(res)) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalBtnText;
+      return;
+    }
+
+    const data = await res.json();
+
+    if (data.success) {
+      showMessage('Image uploaded successfully!', 'success');
+      fileNameEl.textContent = '';
+      form.reset();
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalBtnText;
+
+      if (data.data) {
+        AppState.images = [data.data, ...AppState.images];
+        AppState.pagination = {
+          page: 1,
+          limit: 12,
+          total: AppState.pagination.total + 1,
+          hasMore: false,
+        };
+        renderGallery(getFilteredImages());
+        updateLoadMoreButton();
+      } else {
+        loadImages();
+      }
+    } else {
+      showMessage(data.error || 'Upload failed.', 'error');
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalBtnText;
+    }
+  } catch (_err) {
+    showMessage('Network error. Is the server running?', 'error');
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalBtnText;
+  }
 });
 
 searchInput.addEventListener('input', (e) => {
@@ -694,10 +783,15 @@ imageGallery.addEventListener('click', (e) => {
 
   if (!window.confirm('Delete this image? This cannot be undone.')) return;
 
+  const originalBtnText = btn.textContent;
   btn.disabled = true;
   btn.textContent = 'Deleting...';
 
-  optimisticDelete(card, id).then(() => {
+  optimisticDelete(card, id).then((success) => {
+    if (!success) {
+      btn.disabled = false;
+      btn.textContent = originalBtnText;
+    }
     updateBulkActionsBar();
   });
 });
@@ -729,7 +823,7 @@ if (lightboxModal) {
 }
 
 // Rename button handler
-imageGallery.addEventListener('click', (e) => {
+imageGallery.addEventListener('click', async (e) => {
   const editBtn = e.target.closest('.btn-edit-name');
   if (!editBtn) return;
 
@@ -743,34 +837,41 @@ imageGallery.addEventListener('click', (e) => {
 
   if (!newName || newName.trim() === currentName) return;
 
+  const originalHtml = editBtn.innerHTML;
   editBtn.disabled = true;
   editBtn.textContent = '...';
 
-  fetch(`${API}images/${id}/displayName`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ displayName: newName.trim() }),
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      if (data.success && data.data) {
-        const idx = AppState.images.findIndex((img) => img._id === id);
-        if (idx !== -1) {
-          AppState.images[idx] = { ...AppState.images[idx], displayName: newName.trim() };
-        }
-        renderGallery(getFilteredImages());
-        showMessage('Image renamed successfully!', 'success', 3000);
-      } else {
-        showMessage(data.error || 'Failed to rename image.', 'error');
-      }
-    })
-    .catch(() => {
-      showMessage('Network error.', 'error');
-    })
-    .finally(() => {
-      editBtn.disabled = false;
-      editBtn.innerHTML = '&#9998;';
+  try {
+    const res = await fetch(`${API}images/${id}/displayName`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ displayName: newName.trim() }),
     });
+
+    if (await handleAuthError(res)) {
+      editBtn.disabled = false;
+      editBtn.innerHTML = originalHtml;
+      return;
+    }
+
+    const data = await res.json();
+
+    if (data.success && data.data) {
+      const idx = AppState.images.findIndex((img) => img._id === id);
+      if (idx !== -1) {
+        AppState.images[idx] = { ...AppState.images[idx], displayName: newName.trim() };
+      }
+      renderGallery(getFilteredImages());
+      showMessage('Image renamed successfully!', 'success', 3000);
+    } else {
+      showMessage(data.error || 'Failed to rename image.', 'error');
+    }
+  } catch (_err) {
+    showMessage('Network error.', 'error');
+  } finally {
+    editBtn.disabled = false;
+    editBtn.innerHTML = originalHtml;
+  }
 });
 
 loadImages();

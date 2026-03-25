@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import cookieParser from 'cookie-parser';
 import { env } from './config/index.js';
 import { connectDB } from './config/database.js';
 import routes from './routes/index.js';
@@ -17,10 +18,16 @@ const rootDir = path.resolve(__dirname, '..');
 const app = express();
 
 app.use(helmet());
-const allowedOrigins = env.cors.origin.split(',').map((o) => o.trim());
-app.use(cors({ origin: allowedOrigins }));
-app.use(express.json({ limit: '10kb' }));
 
+// Configure CORS
+const allowedOrigins = env.cors.origin.split(',').map((o) => o.trim());
+app.use(cors({ origin: allowedOrigins, credentials: true }));
+
+// Middlewares
+app.use(express.json({ limit: '10kb' }));
+app.use(cookieParser());
+
+// Static Files & Uploads
 const uploadDir = path.resolve(rootDir, env.uploadsFolder);
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -33,10 +40,14 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(rootDir, 'public', 'index.html'));
 });
 
+// Routes
 app.use(routes);
+
+// Error Handling
 app.use(multerErrorHandler);
 app.use(errorHandler);
 
+// Database Connection
 await connectDB();
 
 export default app;

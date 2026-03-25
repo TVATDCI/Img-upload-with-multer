@@ -104,7 +104,7 @@ export const getImageById = async (id) => {
 };
 
 export const updateImageDisplayName = async (id, displayName) => {
-  return Image.findByIdAndUpdate(id, { displayName }, { new: true });
+  return Image.findByIdAndUpdate(id, { displayName }, { returnDocument: 'after' });
 };
 
 export const deleteImage = async (id) => {

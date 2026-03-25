@@ -15,4 +15,12 @@ export const env = {
   cors: {
     origin: process.env.ALLOWED_ORIGINS || '*',
   },
+  jwt: {
+    secret: process.env.JWT_SECRET || 'fallback-secret-for-dev-only',
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  },
+  admin: {
+    email: process.env.ADMIN_EMAIL,
+    password: process.env.ADMIN_PASSWORD,
+  },
 };
