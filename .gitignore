@@ -6,3 +6,8 @@ uploads/
 # Ignore node_modules
 **/node_modules
 .kilo/
+
+# Test artifacts
+coverage/
+test-results/
+*.pending

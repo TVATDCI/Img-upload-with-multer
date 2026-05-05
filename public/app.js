@@ -1,3 +1,5 @@
+import { initUploadQueue } from './uploadQueue.js';
+
 const API = '/';
 
 const AppState = {
@@ -7,6 +9,8 @@ const AppState = {
   viewMode: 'grid',
   searchQuery: '',
   sortMode: 'date',
+  albumFilter: '',
+  albums: [],
   userRole: 'guest', // 'guest' | 'admin'
   pagination: {
     page: 1,
@@ -309,6 +313,14 @@ function getFilteredImages() {
     });
   }
 
+  // Apply album filter
+  if (AppState.albumFilter) {
+    images = images.filter((img) => {
+      const albumId = img.album?._id || img.album;
+      return albumId === AppState.albumFilter;
+    });
+  }
+
   // Apply sorting
   images = [...images].sort((a, b) => {
     switch (AppState.sortMode) {
@@ -392,10 +404,10 @@ function renderGallery(images) {
     imageGallery.appendChild(card);
   });
 
-  syncSelectAllCheckbox(images);
+  syncSelectAllCheckbox();
 }
 
-function syncSelectAllCheckbox(images) {
+function syncSelectAllCheckbox() {
   const allCheckboxes = imageGallery.querySelectorAll('.img-checkbox');
   const filteredImages = getFilteredImages();
   selectAllCheckbox.checked =
@@ -475,6 +487,26 @@ async function loadImages() {
       '<p class="empty-state">Failed to load images. Is the server running?</p>';
   } finally {
     AppState.setState({ isLoading: false });
+  }
+}
+
+async function loadAlbumsForFilter() {
+  const albumFilterSelect = document.getElementById('album-filter');
+  if (!albumFilterSelect) return;
+
+  try {
+    const res = await fetch(`${API}albums`);
+    const data = await res.json();
+
+    if (data.success && Array.isArray(data.data)) {
+      AppState.setState({ albums: data.data });
+      const currentFilter = albumFilterSelect.value;
+      albumFilterSelect.innerHTML = '<option value="">All Albums</option>' +
+        data.data.map((album) => `<option value="${album._id}">${escapeHtml(album.name)}</option>`).join('');
+      albumFilterSelect.value = currentFilter;
+    }
+  } catch (_err) {
+    // Best-effort album loading
   }
 }
 
@@ -706,7 +738,8 @@ form.addEventListener('submit', async (e) => {
         renderGallery(getFilteredImages());
         updateLoadMoreButton();
       } else {
-        loadImages();
+initUploadQueue();
+loadImages();
       }
     } else {
       showMessage(data.error || 'Upload failed.', 'error');
@@ -738,6 +771,15 @@ const sortSelect = document.getElementById('sort-select');
 if (sortSelect) {
   sortSelect.addEventListener('change', (e) => {
     AppState.sortMode = e.target.value;
+    renderGallery(getFilteredImages());
+  });
+}
+
+// Album filter handler
+const albumFilterSelect = document.getElementById('album-filter');
+if (albumFilterSelect) {
+  albumFilterSelect.addEventListener('change', (e) => {
+    AppState.albumFilter = e.target.value;
     renderGallery(getFilteredImages());
   });
 }
@@ -885,4 +927,7 @@ imageGallery.addEventListener('click', async (e) => {
   }
 });
 
+initUploadQueue();
+window.loadImages = loadImages;
 loadImages();
+loadAlbumsForFilter();

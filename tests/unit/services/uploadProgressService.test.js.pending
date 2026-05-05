@@ -1,0 +1,156 @@
+import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
+import {
+  createUploadProgressService,
+  DEFAULT_HEARTBEAT_MS,
+  DEFAULT_INACTIVITY_TIMEOUT_MS,
+  DEFAULT_JOB_TTL_MS,
+} from '../../../src/services/uploadProgressService.js';
+
+const createMockResponse = () => ({
+  writes: [],
+  ended: false,
+  write(chunk) {
+    this.writes.push(chunk);
+  },
+  end() {
+    this.ended = true;
+  },
+});
+
+const parseEvents = (writes) =>
+  writes
+    .join('')
+    .trim()
+    .split('\n\n')
+    .filter(Boolean)
+    .map((entry) => {
+      const lines = entry.split('\n');
+      const event = lines.find((line) => line.startsWith('event: '))?.replace('event: ', '');
+      const dataLine = lines.find((line) => line.startsWith('data: '))?.replace('data: ', '');
+
+      return {
+        event,
+        data: dataLine ? JSON.parse(dataLine) : null,
+      };
+    });
+
+describe('uploadProgressService', () => {
+  let service;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    service = createUploadProgressService();
+  });
+
+  afterEach(() => {
+    service.reset();
+    jest.useRealTimers();
+  });
+
+  test('creates queued jobs and streams queued snapshots to clients', () => {
+    const job = service.createJob({ jobId: 'job-1', totalFiles: 2 });
+    const res = createMockResponse();
+
+    const attached = service.attachClient(job.jobId, res);
+
+    expect(attached).toBe(true);
+    expect(service.getJobSnapshot(job.jobId)).toMatchObject({
+      jobId: 'job-1',
+      totalFiles: 2,
+      completedFiles: 0,
+      failedFiles: 0,
+      overallPercent: 0,
+      status: 'queued',
+    });
+
+    expect(parseEvents(res.writes)).toEqual([
+      {
+        event: 'queued',
+        data: expect.objectContaining({
+          jobId: 'job-1',
+          totalFiles: 2,
+          overallPercent: 0,
+          status: 'queued',
+        }),
+      },
+    ]);
+  });
+
+  test('reconnect sends aggregate snapshot followed by latest per-file deltas', () => {
+    service.createJob({ jobId: 'job-2', totalFiles: 2 });
+    service.recordProcessing({
+      jobId: 'job-2',
+      fileIndex: 0,
+      filename: 'alpha.png',
+      message: 'Uploading to Cloudinary',
+    });
+    service.recordUploaded({
+      jobId: 'job-2',
+      fileIndex: 0,
+      filename: 'alpha.png',
+      imageId: 'img-1',
+    });
+
+    const res = createMockResponse();
+    service.attachClient('job-2', res);
+    const events = parseEvents(res.writes);
+
+    expect(events[0]).toEqual({
+      event: 'queued',
+      data: expect.objectContaining({
+        jobId: 'job-2',
+        totalFiles: 2,
+        completedFiles: 1,
+        overallPercent: 50,
+        status: 'processing',
+      }),
+    });
+    expect(events).toContainEqual({
+      event: 'uploaded',
+      data: expect.objectContaining({
+        jobId: 'job-2',
+        fileIndex: 0,
+        filename: 'alpha.png',
+        imageId: 'img-1',
+        progressPercent: 100,
+        status: 'uploaded',
+      }),
+    });
+  });
+
+  test('emits heartbeats and closes inactive streams after five minutes', () => {
+    service.createJob({ jobId: 'job-3', totalFiles: 1 });
+    const res = createMockResponse();
+    service.attachClient('job-3', res);
+
+    jest.advanceTimersByTime(DEFAULT_HEARTBEAT_MS);
+    expect(parseEvents(res.writes)).toContainEqual({
+      event: 'heartbeat',
+      data: expect.objectContaining({
+        jobId: 'job-3',
+      }),
+    });
+
+    jest.advanceTimersByTime(DEFAULT_INACTIVITY_TIMEOUT_MS);
+    expect(res.ended).toBe(true);
+  });
+
+  test('retains completed jobs until TTL cleanup expires', () => {
+    service.createJob({ jobId: 'job-4', totalFiles: 1 });
+    service.recordUploaded({
+      jobId: 'job-4',
+      fileIndex: 0,
+      filename: 'done.png',
+      imageId: 'img-4',
+    });
+    service.completeJob({ jobId: 'job-4', succeeded: 1, failed: 0 });
+
+    jest.advanceTimersByTime(DEFAULT_JOB_TTL_MS - 1);
+    service.cleanupExpiredJobs();
+    expect(service.getJobSnapshot('job-4')).not.toBeNull();
+
+    jest.advanceTimersByTime(1);
+    service.cleanupExpiredJobs();
+    expect(service.getJobSnapshot('job-4')).toBeNull();
+  });
+});

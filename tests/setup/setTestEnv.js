@@ -1,0 +1,11 @@
+process.env.NODE_ENV = 'test';
+process.env.PORT = process.env.PORT || '3101';
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
+process.env.JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1d';
+process.env.ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS || 'http://127.0.0.1:3101';
+process.env.UPLOADS_FOLDER = process.env.UPLOADS_FOLDER || 'uploads-test';
+process.env.ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@example.com';
+process.env.ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Password123!';
+process.env.CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || 'test-cloud';
+process.env.CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY || 'test-key';
+process.env.CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET || 'test-secret';

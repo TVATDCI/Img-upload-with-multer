@@ -12,19 +12,93 @@
 
     <div id="message"></div>
 
-    <div class="upload-box">
-      <form id="uploadForm">
-        <input
-          type="file"
-          id="image"
-          name="image"
-          accept="image/*"
-          required
-          aria-label="Select an image to upload"
-        />
-        <div id="fileName" class="file-name"></div>
-        <button type="submit" id="submitBtn">Upload</button>
-      </form>
+    <!-- Batch Upload Section -->
+    <div class="batch-upload-section">
+      <div class="upload-mode-toggle">
+        <button id="mode-single" class="mode-btn active">Single Upload</button>
+        <button id="mode-batch" class="mode-btn">Batch Upload</button>
+      </div>
+
+      <!-- Single Upload (legacy) -->
+      <div id="single-upload-panel" class="upload-panel active">
+        <div class="upload-box">
+          <form id="uploadForm">
+            <input
+              type="file"
+              id="image"
+              name="image"
+              accept="image/*"
+              required
+              aria-label="Select an image to upload"
+            />
+            <div id="fileName" class="file-name"></div>
+            <button type="submit" id="submitBtn">Upload</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Batch Upload -->
+      <div id="batch-upload-panel" class="upload-panel">
+        <div id="drop-zone" class="drop-zone">
+          <div class="drop-zone-content">
+            <svg class="drop-zone-icon" viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p class="drop-zone-text">Drag & drop images here</p>
+            <p class="drop-zone-subtext">or click to browse (max 10 files, 200KB each)</p>
+            <input
+              type="file"
+              id="batch-file-input"
+              class="batch-file-input"
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              multiple
+              aria-label="Select images for batch upload"
+            />
+          </div>
+        </div>
+
+        <div id="queue-message" class="queue-message"></div>
+
+        <!-- Upload Queue -->
+        <div id="upload-queue" class="upload-queue">
+          <p class="queue-empty">Drop files here or click to browse</p>
+        </div>
+
+        <!-- Batch Options -->
+        <div class="batch-options">
+          <label class="batch-option-label">
+            <span>Album:</span>
+            <select id="album-select" class="batch-select">
+              <option value="">-- No Album --</option>
+            </select>
+          </label>
+          <label class="batch-option-label">
+            <span>Watermark:</span>
+            <input
+              type="text"
+              id="watermark-input"
+              class="batch-input"
+              placeholder="Optional text watermark (1-50 chars)"
+              maxlength="50"
+            />
+          </label>
+        </div>
+
+        <!-- Batch Progress -->
+        <div id="batch-progress" class="batch-progress">
+          <div class="batch-progress-header">
+            <span>Overall Progress</span>
+            <span id="overall-progress-text">0%</span>
+          </div>
+          <div class="batch-progress-bar-container">
+            <div id="overall-progress-bar" class="batch-progress-bar"></div>
+          </div>
+        </div>
+
+        <button id="submit-batch-btn" class="btn-submit-batch" disabled>Upload</button>
+      </div>
     </div>
 
     <div class="gallery">
@@ -38,6 +112,9 @@
             placeholder="Search by filename or storage type..."
             aria-label="Search images"
           />
+          <select id="album-filter" class="album-filter" aria-label="Filter by album">
+            <option value="">All Albums</option>
+          </select>
           <select id="sort-select" class="sort-select" aria-label="Sort images">
             <option value="date">Date (Newest)</option>
             <option value="name">Name (A-Z)</option>
@@ -146,6 +223,7 @@
       <div id="tag-filter-list" class="tag-filter-list"></div>
     </div>
 
-    <script src="/app.js"></script>
+    <script type="module" src="/uploadQueue.js"></script>
+    <script type="module" src="/app.js"></script>
   </body>
 </html>

@@ -1,0 +1,168 @@
+import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
+import { createBatchUploadService } from '../../../src/services/batchUploadService.js';
+
+describe('batchUploadService', () => {
+  let progressService;
+  let deleteLocalAsset;
+  let deleteRemoteAsset;
+  let deletePersistedImages;
+  let logger;
+
+  beforeEach(() => {
+    progressService = {
+      createJob: jest.fn(({ jobId = 'job-1', totalFiles }) => ({ jobId, totalFiles })),
+      recordProcessing: jest.fn(),
+      recordUploaded: jest.fn(),
+      recordFailed: jest.fn(),
+      recordRolledBack: jest.fn(),
+      completeJob: jest.fn(),
+    };
+    deleteLocalAsset = jest.fn();
+    deleteRemoteAsset = jest.fn();
+    deletePersistedImages = jest.fn();
+    logger = { info: jest.fn(), warn: jest.fn(), error: jest.fn() };
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test('rejects empty batches and batches larger than ten files', async () => {
+    const service = createBatchUploadService({
+      progressService,
+      deleteLocalAsset,
+      deleteRemoteAsset,
+      deletePersistedImages,
+      logger,
+    });
+
+    await expect(service.createBatchUpload({ files: [], userIp: '127.0.0.1' })).rejects.toThrow(
+      'Batch upload requires between 1 and 10 files.'
+    );
+
+    const tooManyFiles = Array.from({ length: 11 }, (_, index) => ({
+      originalname: `file-${index}.png`,
+      filename: `file-${index}.png`,
+      path: `/tmp/file-${index}.png`,
+      size: 128,
+    }));
+
+    await expect(service.createBatchUpload({ files: tooManyFiles, userIp: '127.0.0.1' })).rejects.toThrow(
+      'Batch upload requires between 1 and 10 files.'
+    );
+  });
+
+  test('limits concurrent file processing', async () => {
+    let activeCount = 0;
+    let maxActiveCount = 0;
+    const createImage = jest.fn(async ({ filename }) => {
+      activeCount += 1;
+      maxActiveCount = Math.max(maxActiveCount, activeCount);
+
+      await new Promise((resolve) => setTimeout(resolve, 5));
+
+      activeCount -= 1;
+      return {
+        _id: `${filename}-id`,
+        filename,
+        originalName: filename,
+        publicId: null,
+        localPath: null,
+      };
+    });
+
+    const service = createBatchUploadService({
+      createImage,
+      startSession: jest.fn(async () => null),
+      progressService,
+      deleteLocalAsset,
+      deleteRemoteAsset,
+      deletePersistedImages,
+      logger,
+      concurrency: 2,
+    });
+
+    const files = Array.from({ length: 4 }, (_, index) => ({
+      originalname: `file-${index}.png`,
+      filename: `file-${index}.png`,
+      path: `/tmp/file-${index}.png`,
+      size: 256,
+    }));
+
+    const { completion } = await service.createBatchUpload({ files, userIp: '127.0.0.1' });
+    await completion;
+
+    expect(maxActiveCount).toBeLessThanOrEqual(2);
+    expect(progressService.recordProcessing).toHaveBeenCalledTimes(4);
+    expect(progressService.recordUploaded).toHaveBeenCalledTimes(4);
+    expect(progressService.completeJob).toHaveBeenCalledWith({
+      jobId: 'job-1',
+      succeeded: 4,
+      failed: 0,
+    });
+  });
+
+  test('rolls back persisted state and temp files when a batch file fails', async () => {
+    const createImage = jest
+      .fn()
+      .mockResolvedValueOnce({
+        _id: 'img-1',
+        filename: 'first.png',
+        originalName: 'first.png',
+        publicId: 'cloud-1',
+        localPath: '/tmp/first.png',
+      })
+      .mockRejectedValueOnce(new Error('second file failed'));
+
+    const service = createBatchUploadService({
+      createImage,
+      startSession: jest.fn(async () => {
+        throw new Error('transactions unavailable');
+      }),
+      progressService,
+      deleteLocalAsset,
+      deleteRemoteAsset,
+      deletePersistedImages,
+      logger,
+      concurrency: 1,
+    });
+
+    const files = [
+      { originalname: 'first.png', filename: 'first.png', path: '/tmp/first.png', size: 100 },
+      { originalname: 'second.png', filename: 'second.png', path: '/tmp/second.png', size: 100 },
+      { originalname: 'third.png', filename: 'third.png', path: '/tmp/third.png', size: 100 },
+    ];
+
+    const { completion } = await service.createBatchUpload({ files, userIp: '127.0.0.1' });
+    const result = await completion;
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        jobId: 'job-1',
+        status: 'rolled_back',
+        rollbackMode: 'compensating',
+      })
+    );
+    expect(progressService.recordFailed).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId: 'job-1',
+        fileIndex: 1,
+        filename: 'second.png',
+        error: 'second file failed',
+      })
+    );
+    expect(progressService.recordRolledBack).toHaveBeenCalledWith({
+      jobId: 'job-1',
+      filesRolledBack: 1,
+    });
+    expect(deleteRemoteAsset).toHaveBeenCalledWith('cloud-1');
+    expect(deletePersistedImages).toHaveBeenCalledWith(['img-1']);
+    expect(deleteLocalAsset).toHaveBeenCalledWith('/tmp/first.png');
+    expect(deleteLocalAsset).toHaveBeenCalledWith('/tmp/second.png');
+    expect(deleteLocalAsset).toHaveBeenCalledWith('/tmp/third.png');
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('compensating rollback fallback'),
+      expect.any(String)
+    );
+  });
+});

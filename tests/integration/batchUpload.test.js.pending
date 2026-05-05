@@ -1,0 +1,280 @@
+import fs from 'fs/promises';
+import http from 'http';
+import request from 'supertest';
+import { afterAll, beforeAll, beforeEach, describe, expect, jest, test } from '@jest/globals';
+import * as cloudinaryService from '../../src/services/cloudinaryService.js';
+import * as imageService from '../../src/services/imageService.js';
+import Image from '../../src/models/Image.js';
+import uploadProgressService from '../../src/services/uploadProgressService.js';
+import {
+  cleanupDb,
+  createAuthCookie,
+  getUploadsDir,
+  sampleJpegPath,
+  samplePngPath,
+  seedAdminUser,
+} from '../utils/testHelpers.js';
+import { setupIntegrationApp, teardownIntegrationApp } from '../utils/testApp.js';
+
+const decoder = new TextDecoder();
+
+const parseSseEvents = (raw) =>
+  raw
+    .trim()
+    .split('\n\n')
+    .filter(Boolean)
+    .map((entry) => {
+      const lines = entry.split('\n');
+      return {
+        event: lines.find((line) => line.startsWith('event: '))?.replace('event: ', ''),
+        data: JSON.parse(lines.find((line) => line.startsWith('data: ')).replace('data: ', '')),
+      };
+    });
+
+const collectSseEvents = async ({ url, cookie, stopWhen }) => {
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'text/event-stream',
+      Cookie: cookie,
+    },
+    signal: AbortSignal.timeout(5000),
+  });
+
+  expect(response.status).toBe(200);
+
+  const reader = response.body.getReader();
+  let buffer = '';
+  const events = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop() ?? '';
+
+    for (const part of parts) {
+      if (!part.trim()) continue;
+      const [eventLine, dataLine] = part.split('\n');
+      const event = eventLine.replace('event: ', '');
+      const data = JSON.parse(dataLine.replace('data: ', ''));
+      events.push({ event, data });
+
+      if (stopWhen?.(events)) {
+        await reader.cancel();
+        return events;
+      }
+    }
+  }
+
+  return events;
+};
+
+describe('batch upload routes', () => {
+  let app;
+  let server;
+  let baseUrl;
+  let authCookie;
+  let actualCreateImage;
+
+  beforeAll(async () => {
+    app = await setupIntegrationApp();
+    server = http.createServer(app);
+    await new Promise((resolve) => server.listen(0, resolve));
+    const { port } = server.address();
+    baseUrl = `http://127.0.0.1:${port}`;
+    actualCreateImage = imageService.createImage;
+  });
+
+  beforeEach(async () => {
+    await cleanupDb();
+    uploadProgressService.reset();
+    jest.restoreAllMocks();
+    jest.spyOn(cloudinaryService, 'uploadToCloudinary').mockRejectedValue(new Error('cloud offline'));
+
+    const admin = await seedAdminUser();
+    authCookie = createAuthCookie(admin);
+  });
+
+  afterAll(async () => {
+    uploadProgressService.reset();
+    await new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
+    await teardownIntegrationApp();
+  });
+
+  test('POST /uploadImages accepts 1-10 files and preserves POST /uploadImage', async () => {
+    const response = await request(app)
+      .post('/uploadImages')
+      .set('Cookie', authCookie)
+      .attach('images', samplePngPath)
+      .attach('images', sampleJpegPath);
+
+    expect(response.status).toBe(201);
+    expect(response.body).toMatchObject({
+      success: true,
+      data: {
+        jobId: expect.any(String),
+      },
+    });
+
+    const singleResponse = await request(app)
+      .post('/uploadImage')
+      .set('Cookie', authCookie)
+      .attach('image', samplePngPath);
+
+    expect(singleResponse.status).toBe(201);
+
+    const emptyResponse = await request(app).post('/uploadImages').set('Cookie', authCookie);
+    expect(emptyResponse.status).toBe(400);
+  });
+
+  test('GET /uploads/progress/:jobId streams the batch event contract through completion', async () => {
+    const response = await request(app)
+      .post('/uploadImages')
+      .set('Cookie', authCookie)
+      .attach('images', samplePngPath)
+      .attach('images', sampleJpegPath);
+
+    const events = await collectSseEvents({
+      url: `${baseUrl}/uploads/progress/${response.body.data.jobId}`,
+      cookie: authCookie,
+      stopWhen: (items) => items.some((item) => item.event === 'completed'),
+    });
+
+    expect(events[0]).toEqual({
+      event: 'queued',
+      data: expect.objectContaining({
+        jobId: response.body.data.jobId,
+        totalFiles: 2,
+      }),
+    });
+    expect(events.filter((event) => event.event === 'processing')).toHaveLength(2);
+    expect(events.filter((event) => event.event === 'uploaded')).toHaveLength(2);
+    expect(events.at(-1)).toEqual({
+      event: 'completed',
+      data: expect.objectContaining({
+        jobId: response.body.data.jobId,
+        succeeded: 2,
+        failed: 0,
+        total: 2,
+        status: 'completed',
+      }),
+    });
+
+    expect(await Image.countDocuments()).toBe(2);
+  });
+
+  test('failed batches roll back partial state and emit failed then rolled_back events', async () => {
+    const createImageSpy = jest.spyOn(imageService, 'createImage');
+    createImageSpy.mockImplementation(async (payload) => {
+      if (payload.originalName === 'sample.jpg') {
+        throw new Error('simulated upload failure');
+      }
+
+      return actualCreateImage(payload);
+    });
+
+    const response = await request(app)
+      .post('/uploadImages')
+      .set('Cookie', authCookie)
+      .attach('images', samplePngPath)
+      .attach('images', sampleJpegPath);
+
+    const events = await collectSseEvents({
+      url: `${baseUrl}/uploads/progress/${response.body.data.jobId}`,
+      cookie: authCookie,
+      stopWhen: (items) => items.some((item) => item.event === 'rolled_back'),
+    });
+
+    expect(events.some((event) => event.event === 'failed')).toBe(true);
+    expect(events.at(-1)).toEqual({
+      event: 'rolled_back',
+      data: expect.objectContaining({
+        jobId: response.body.data.jobId,
+        filesRolledBack: 1,
+        status: 'rolled_back',
+      }),
+    });
+    expect(await Image.countDocuments()).toBe(0);
+    expect(await fs.readdir(getUploadsDir())).toHaveLength(0);
+  });
+
+  test('reconnecting clients receive the current aggregate state and latest per-file deltas', async () => {
+    const job = uploadProgressService.createJob({ jobId: 'reconnect-job', totalFiles: 2 });
+    uploadProgressService.recordProcessing({
+      jobId: job.jobId,
+      fileIndex: 0,
+      filename: 'alpha.png',
+      message: 'Uploading to Cloudinary',
+    });
+    uploadProgressService.recordUploaded({
+      jobId: job.jobId,
+      fileIndex: 0,
+      filename: 'alpha.png',
+      imageId: 'img-1',
+    });
+
+    const events = await collectSseEvents({
+      url: `${baseUrl}/uploads/progress/${job.jobId}`,
+      cookie: authCookie,
+      stopWhen: (items) => items.length >= 2,
+    });
+
+    expect(events[0]).toEqual({
+      event: 'queued',
+      data: expect.objectContaining({
+        jobId: job.jobId,
+        completedFiles: 1,
+        overallPercent: 50,
+        status: 'processing',
+      }),
+    });
+    expect(events[1]).toEqual({
+      event: 'uploaded',
+      data: expect.objectContaining({
+        jobId: job.jobId,
+        fileIndex: 0,
+        filename: 'alpha.png',
+        imageId: 'img-1',
+      }),
+    });
+  });
+
+  test('completed jobs can be fetched as SSE snapshots without replaying full history', async () => {
+    const job = uploadProgressService.createJob({ jobId: 'snapshot-job', totalFiles: 1 });
+    uploadProgressService.recordUploaded({
+      jobId: job.jobId,
+      fileIndex: 0,
+      filename: 'done.png',
+      imageId: 'img-9',
+    });
+    uploadProgressService.completeJob({ jobId: job.jobId, succeeded: 1, failed: 0 });
+
+    const response = await fetch(`${baseUrl}/uploads/progress/${job.jobId}`, {
+      headers: {
+        Accept: 'text/event-stream',
+        Cookie: authCookie,
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+
+    const body = await response.text();
+    const events = parseSseEvents(body);
+
+    expect(events[0]).toEqual({
+      event: 'completed',
+      data: expect.objectContaining({
+        jobId: 'snapshot-job',
+        succeeded: 1,
+        failed: 0,
+        total: 1,
+        status: 'completed',
+      }),
+    });
+    expect(events).toHaveLength(1);
+  });
+});

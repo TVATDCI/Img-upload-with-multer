@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
-import { success, badRequest, unauthorized, error } from '../utils/responseHelper.js';
+import { success, badRequest, unauthorized } from '../utils/responseHelper.js';
 import { env } from '../config/index.js';
 
 const parseJwtExpiresIn = (expiresIn) => {
