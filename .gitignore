@@ -11,3 +11,7 @@ uploads/
 coverage/
 test-results/
 *.pending
+
+# Testing logs & files
+/TEST_PROMPT_MONGODB_SYNC.md
+.sissyphus/
