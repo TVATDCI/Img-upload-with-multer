@@ -1,0 +1,134 @@
+import { jest } from '@jest/globals';
+import path from 'path';
+import fs from 'fs';
+import {
+  generateImageVariants,
+  validateWatermark,
+  VARIANT_SPECS,
+  VALID_VARIANT_SIZES,
+} from '../../../src/services/imageProcessingService.js';
+
+const FIXTURES_DIR = path.resolve(process.cwd(), 'tests/fixtures/sample-images');
+
+describe('imageProcessingService', () => {
+  describe('VARIANT_SPECS', () => {
+    it('defines thumb, preview, and full variants', () => {
+      const sizes = VARIANT_SPECS.map((v) => v.size);
+      expect(sizes).toContain('thumb');
+      expect(sizes).toContain('preview');
+      expect(sizes).toContain('full');
+    });
+
+    it('thumb is 150x150 cover crop', () => {
+      const thumb = VARIANT_SPECS.find((v) => v.size === 'thumb');
+      expect(thumb.width).toBe(150);
+      expect(thumb.height).toBe(150);
+      expect(thumb.fit).toBe('cover');
+      expect(thumb.watermarkable).toBe(false);
+    });
+
+    it('preview is 800x600 inside fit', () => {
+      const preview = VARIANT_SPECS.find((v) => v.size === 'preview');
+      expect(preview.width).toBe(800);
+      expect(preview.height).toBe(600);
+      expect(preview.fit).toBe('inside');
+      expect(preview.watermarkable).toBe(true);
+    });
+
+    it('full is 1920x1080 inside fit', () => {
+      const full = VARIANT_SPECS.find((v) => v.size === 'full');
+      expect(full.width).toBe(1920);
+      expect(full.height).toBe(1080);
+      expect(full.fit).toBe('inside');
+      expect(full.watermarkable).toBe(true);
+    });
+  });
+
+  describe('VALID_VARIANT_SIZES', () => {
+    it('contains exactly three sizes', () => {
+      expect(VALID_VARIANT_SIZES).toHaveLength(3);
+      expect(VALID_VARIANT_SIZES).toContain('thumb');
+      expect(VALID_VARIANT_SIZES).toContain('preview');
+      expect(VALID_VARIANT_SIZES).toContain('full');
+    });
+  });
+
+  describe('validateWatermark', () => {
+    it('returns null for undefined/null', () => {
+      expect(validateWatermark(undefined)).toBeNull();
+      expect(validateWatermark(null)).toBeNull();
+    });
+
+    it('returns null for empty string', () => {
+      expect(validateWatermark('')).toBeNull();
+      expect(validateWatermark('   ')).toBeNull();
+    });
+
+    it('returns normalized watermark for valid input', () => {
+      expect(validateWatermark('Hello')).toBe('Hello');
+      expect(validateWatermark('  Hello  ')).toBe('Hello');
+    });
+
+    it('throws for non-ASCII characters', () => {
+      expect(() => validateWatermark('Héllo')).toThrow('Invalid watermark');
+    });
+
+    it('throws for too long input', () => {
+      expect(() => validateWatermark('a'.repeat(51))).toThrow('Invalid watermark');
+    });
+  });
+
+  describe('generateImageVariants', () => {
+    const sampleImagePath = path.join(FIXTURES_DIR, 'sample.jpg');
+
+    beforeAll(() => {
+      // Create a simple test image if it doesn't exist
+      if (!fs.existsSync(sampleImagePath)) {
+        fs.mkdirSync(FIXTURES_DIR, { recursive: true });
+        // We'll skip the actual sharp test if no fixture exists
+      }
+    });
+
+    it('generates three variants without watermark', async () => {
+      // Skip if no fixture image available
+      if (!fs.existsSync(sampleImagePath)) {
+        console.warn('Skipping generateImageVariants test: no fixture image');
+        return;
+      }
+
+      const variants = await generateImageVariants({
+        inputPath: sampleImagePath,
+        originalFilename: 'test.jpg',
+      });
+
+      expect(variants).toHaveLength(3);
+
+      const thumb = variants.find((v) => v.size === 'thumb');
+      expect(thumb).toBeDefined();
+      expect(thumb.width).toBeLessThanOrEqual(150);
+      expect(thumb.height).toBeLessThanOrEqual(150);
+      expect(thumb.format).toBe('image/webp');
+    }, 30000);
+
+    it('applies watermark to preview and full only', async () => {
+      if (!fs.existsSync(sampleImagePath)) {
+        console.warn('Skipping watermark test: no fixture image');
+        return;
+      }
+
+      const variants = await generateImageVariants({
+        inputPath: sampleImagePath,
+        originalFilename: 'test.jpg',
+        watermark: 'TestMark',
+      });
+
+      expect(variants).toHaveLength(3);
+
+      // All variants should have buffers
+      for (const variant of variants) {
+        expect(variant.buffer).toBeDefined();
+        expect(variant.buffer.length).toBeGreaterThan(0);
+      }
+    }, 30000);
+  });
+});

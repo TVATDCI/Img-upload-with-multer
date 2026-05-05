@@ -25,7 +25,7 @@ export const protect = async (req, res, next) => {
     let decoded;
     try {
       decoded = await promisify(jwt.verify)(token, env.jwt.secret);
-    } catch (err) {
+    } catch {
       return unauthorized(res, 'Invalid or expired token. Please login again.');
     }
 

@@ -1,9 +1,12 @@
-import Image from '../models/Image.js';
-import { uploadToCloudinary, deleteFromCloudinary } from './cloudinaryService.js';
-import { deleteFile } from '../utils/fileUtils.js';
+import fs from 'fs';
 import { imageSize } from 'image-size';
 import { getPalette } from 'colorthief';
-import fs from 'fs';
+import Image from '../models/Image.js';
+import { uploadToCloudinary, deleteFromCloudinary } from './cloudinaryService.js';
+import { syncAlbumCoverAfterImageRemoval } from './albumService.js';
+import { deleteFile } from '../utils/fileUtils.js';
+import { generateImageVariants, validateWatermark } from './imageProcessingService.js';
+import { storeVariant, deleteImageVariants } from './storageVariantService.js';
 
 async function extractLocalMetadata(localFilePath) {
   const metadata = {
@@ -36,12 +39,14 @@ async function extractLocalMetadata(localFilePath) {
   return metadata;
 }
 
-export const createImage = async ({ filename, originalName, localFilePath, size, user_ip }) => {
+export const createImage = async ({ filename, originalName, localFilePath, size, user_ip, watermark = null, albumId = null }) => {
   let publicId = null;
   let path = `/uploads/${filename}`;
   let dimensions = {};
   let colors = [];
   let fileType = null;
+  let variants = [];
+  let watermarked = false;
 
   try {
     const result = await uploadToCloudinary(localFilePath, { colors: true });
@@ -70,6 +75,33 @@ export const createImage = async ({ filename, originalName, localFilePath, size,
     fileType = localMetadata.fileType;
   }
 
+  const validatedWatermark = watermark ? validateWatermark(watermark) : null;
+  watermarked = !!validatedWatermark;
+
+  // Generate and store variants BEFORE deleting the original local file
+  try {
+    const variantResults = await generateImageVariants({
+      inputPath: localFilePath,
+      originalFilename: filename,
+      watermark: validatedWatermark,
+    });
+
+    for (const variantResult of variantResults) {
+      const stored = await storeVariant(variantResult);
+
+      variants.push({
+        size: variantResult.size,
+        width: variantResult.width,
+        height: variantResult.height,
+        format: variantResult.format,
+        path: stored.webpPath,
+        localPath: stored.localWebpPath,
+      });
+    }
+  } catch {
+    // Variant generation is best-effort
+  }
+
   const image = new Image({
     filename,
     originalName: originalName || filename,
@@ -82,6 +114,9 @@ export const createImage = async ({ filename, originalName, localFilePath, size,
     fileType,
     uploadDate: new Date(),
     user_ip,
+    album: albumId,
+    variants,
+    watermarked,
   });
   await image.save();
   return image;
@@ -123,7 +158,11 @@ export const deleteImage = async (id) => {
     deleteFile(image.localPath);
   }
 
+  // Delete variant files
+  deleteImageVariants(image.variants);
+
   await Image.findByIdAndDelete(id);
+  await syncAlbumCoverAfterImageRemoval(image);
   return image;
 };
 

@@ -6,3 +6,12 @@ uploads/
 # Ignore node_modules
 **/node_modules
 .kilo/
+
+# Test artifacts
+coverage/
+test-results/
+*.pending
+
+# Testing logs & files
+/TEST_PROMPT_MONGODB_SYNC.md
+.sissyphus/

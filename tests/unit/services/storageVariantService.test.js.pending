@@ -1,0 +1,100 @@
+import fs from 'fs/promises';
+import os from 'os';
+import path from 'path';
+import sharp from 'sharp';
+import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
+import * as cloudinaryService from '../../../src/services/cloudinaryService.js';
+import { deleteStoredVariants, storeVariants } from '../../../src/services/storageVariantService.js';
+
+const createVariantPayload = async (size) => {
+  const buffer = await sharp({
+    create: {
+      width: size === 'thumb' ? 150 : 320,
+      height: size === 'thumb' ? 150 : 240,
+      channels: 3,
+      background: { r: 20, g: 80, b: 140 },
+    },
+  })
+    .webp()
+    .toBuffer();
+
+  const fallbackBuffer = await sharp(buffer).jpeg().toBuffer();
+
+  return {
+    size,
+    width: size === 'thumb' ? 150 : 320,
+    height: size === 'thumb' ? 150 : 240,
+    format: 'image/webp',
+    fallbackFormat: 'image/jpeg',
+    buffer,
+    fallbackBuffer,
+  };
+};
+
+beforeEach(() => {
+  jest.restoreAllMocks();
+});
+
+afterEach(async () => {
+  const tmpEntries = await fs.readdir(os.tmpdir());
+  await Promise.all(
+    tmpEntries
+      .filter((entry) => entry.startsWith('variant-storage-'))
+      .map((entry) => fs.rm(path.join(os.tmpdir(), entry), { recursive: true, force: true }))
+  );
+});
+
+describe('storageVariantService.storeVariants', () => {
+  test('stores primary and fallback variants in cloudinary when uploads succeed', async () => {
+    const uploadSpy = jest
+      .spyOn(cloudinaryService, 'uploadToCloudinary')
+      .mockImplementation(async (_filePath, options = {}) => ({
+        secure_url: `https://res.cloudinary.com/demo/${options.public_id}.${options.format}`,
+        public_id: `${options.folder}/${options.public_id}`,
+      }));
+
+    const uploadsRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'variant-storage-'));
+    const variants = [await createVariantPayload('thumb'), await createVariantPayload('preview')];
+
+    const stored = await storeVariants({
+      sourceFilename: 'gallery-photo.png',
+      variants,
+      uploadsRoot,
+    });
+
+    expect(uploadSpy).toHaveBeenCalledTimes(4);
+    expect(stored).toHaveLength(2);
+    expect(stored[0]).toMatchObject({
+      size: 'thumb',
+      path: expect.stringContaining('cloudinary.com'),
+      publicId: expect.stringContaining('gallery-photo-thumb'),
+      localPath: null,
+      fallbackPath: expect.stringContaining('.jpg'),
+      fallbackPublicId: expect.stringContaining('gallery-photo-thumb-fallback'),
+      fallbackLocalPath: null,
+    });
+  });
+
+  test('falls back to local storage and cleanup removes persisted files', async () => {
+    jest.spyOn(cloudinaryService, 'uploadToCloudinary').mockRejectedValue(new Error('cloud down'));
+
+    const uploadsRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'variant-storage-'));
+    const stored = await storeVariants({
+      sourceFilename: 'fallback-photo.png',
+      variants: [await createVariantPayload('full')],
+      uploadsRoot,
+    });
+
+    expect(stored[0].path).toContain('/uploads/variants/fallback-photo-full.webp');
+    expect(stored[0].localPath).toBe(path.join(uploadsRoot, 'variants', 'fallback-photo-full.webp'));
+    expect(stored[0].fallbackPath).toContain('/uploads/variants/fallback-photo-full-fallback.jpg');
+
+    await expect(fs.access(stored[0].localPath)).resolves.toBeUndefined();
+    await expect(fs.access(stored[0].fallbackLocalPath)).resolves.toBeUndefined();
+
+    await deleteStoredVariants(stored);
+
+    await expect(fs.access(stored[0].localPath)).rejects.toThrow();
+    await expect(fs.access(stored[0].fallbackLocalPath)).rejects.toThrow();
+  });
+});

@@ -13,6 +13,7 @@ A production-ready Express.js image upload API with MongoDB storage and Cloudina
 | [v1.3](https://github.com/TVATDCI/Img-upload-with-multer/tree/main)     | Asset Inspector: dimensions, colors, AI metadata, split-view modal | Phase 3      |
 | **v1.4 (Current)**                                                      | **Admin Authorization: JWT, RBAC, Secure Cookies, Portfolio Mode** | **Phase 4**  |
 | **v1.4.1 (Hotfix)**                                                     | **Security: Rate limiting on auth, JWT/cookie sync, logout UX**    | **Mar 2026** |
+| **v1.4.2 (Hotfix)**                                                     | **Bug fixes: Batch upload UI mode toggle, SSE progress percentage, completion confirmation, syncImagesToDB script** | **May 2026** |
 
 ---
 
@@ -71,7 +72,8 @@ public/                    # Frontend (served at /)
 └── login.js             # Login form logic (NEW)
 
 scripts/
-└── seedAdmin.js          # Admin account creation script (NEW)
+├── seedAdmin.js          # Admin account creation script
+└── syncImagesToDB.js     # Sync orphaned uploads to MongoDB
 
 server.js                 # Entry point
 app.js                    # Express app setup
@@ -111,7 +113,17 @@ cp .env.example .env
 node scripts/seedAdmin.js
 ```
 
-### 4. Start the server
+### 4. Sync Existing Images (if needed)
+
+If your uploads folder has images but MongoDB is empty, run the sync script:
+
+```bash
+node scripts/syncImagesToDB.js
+```
+
+This creates database records for any orphaned files in `/uploads/`.
+
+### 5. Start the server
 
 ```bash
 npm start
@@ -121,16 +133,18 @@ npm start
 
 ## API Endpoints
 
-| Method | Endpoint                  | Access | Description                  |
-| ------ | ------------------------- | ------ | ---------------------------- |
-| POST   | `/auth/login`             | Public | Admin login (sets cookie)    |
-| POST   | `/auth/logout`            | Public | Clear auth cookie            |
-| GET    | `/images`                 | Public | Paginated image list         |
-| GET    | `/images/:id/src`         | Public | Image proxy for lightbox     |
-| POST   | `/uploadImage`            | Admin  | Upload an image (max 200KB)  |
-| PATCH  | `/images/:id/displayName` | Admin  | Update display name          |
-| DELETE | `/images/:id`             | Admin  | Delete single image          |
-| DELETE | `/images/batch`           | Admin  | Batch delete multiple images |
+| Method | Endpoint                   | Access | Description                        |
+| ------ | -------------------------- | ------ | ---------------------------------- |
+| POST   | `/auth/login`              | Public | Admin login (sets cookie)          |
+| POST   | `/auth/logout`             | Public | Clear auth cookie                    |
+| GET    | `/images`                  | Public | Paginated image list                 |
+| GET    | `/images/:id/src`          | Public | Image proxy for lightbox             |
+| POST   | `/uploadImage`             | Admin  | Upload an image (max 200KB)          |
+| POST   | `/uploadImages`            | Admin  | Batch upload (1-10 files)            |
+| GET    | `/uploads/progress/:jobId` | Public | SSE progress stream for batch upload |
+| PATCH  | `/images/:id/displayName`  | Admin  | Update display name                  |
+| DELETE | `/images/:id`              | Admin  | Delete single image                  |
+| DELETE | `/images/batch`            | Admin  | Batch delete multiple images         |
 
 ---
 
@@ -147,6 +161,13 @@ npm start
 - **Dimensions**: Width × Height extracted on upload.
 - **Colors**: 6 dominant colors extracted automatically (via Sharp + Colorthief).
 - **Asset Inspector**: Professional split-view lightbox with technical metadata sidebar.
+
+### Batch Upload
+
+- **Drag & Drop**: Drop multiple files (max 10, 200KB each) into the batch upload zone.
+- **Live Progress**: SSE-based progress stream shows per-file and overall progress percentage.
+- **Album Assignment**: Optionally assign all batch files to an existing album during upload.
+- **Watermarking**: Apply optional text watermark to all images in a batch.
 
 ---
 

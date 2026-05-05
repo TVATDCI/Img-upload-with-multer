@@ -954,6 +954,335 @@ h1 {
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
+/* Batch Upload Section */
+.batch-upload-section {
+  margin-bottom: 24px;
+}
+
+.upload-mode-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mode-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--color-border);
+  background: var(--color-white);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all var(--transition-fast);
+}
+
+.mode-btn.active {
+  background: var(--color-primary);
+  color: var(--color-white);
+  border-color: var(--color-primary);
+}
+
+.upload-panel {
+  display: none;
+}
+
+.upload-panel.active {
+  display: block;
+}
+
+/* Drop Zone */
+.drop-zone {
+  border: 2px dashed var(--color-border-dashed);
+  border-radius: var(--radius-lg);
+  padding: 32px 24px;
+  text-align: center;
+  background: var(--color-white);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  position: relative;
+}
+
+.drop-zone.dragover {
+  border-color: var(--color-primary);
+  background: var(--color-selection);
+}
+
+.drop-zone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.drop-zone-icon {
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+
+.drop-zone-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.drop-zone-subtext {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.batch-file-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Upload Queue */
+.upload-queue {
+  margin-top: 16px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.queue-empty {
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  padding: 24px;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: 8px;
+}
+
+.queue-item.rejected {
+  border-color: var(--color-danger-border);
+  background: #fef2f2;
+}
+
+.queue-item-preview {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--color-bg-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.queue-item-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.queue-item-placeholder {
+  font-size: 20px;
+  color: var(--color-text-muted);
+}
+
+.queue-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.queue-item-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-item-size {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.queue-item-error {
+  font-size: 12px;
+  color: var(--color-danger);
+  margin-top: 2px;
+}
+
+.queue-item-success {
+  font-size: 12px;
+  color: var(--color-success);
+}
+
+.queue-item-failed {
+  font-size: 12px;
+  color: var(--color-danger);
+}
+
+.queue-item-progress {
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.queue-item-progress-bar {
+  height: 100%;
+  background: var(--color-primary);
+  transition: width var(--transition-fast);
+}
+
+.queue-item-remove {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.queue-item-remove:hover {
+  color: var(--color-danger);
+}
+
+/* Queue Message */
+.queue-message {
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  margin: 8px 0;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+  display: none;
+}
+
+.queue-message.show {
+  opacity: 1;
+  display: block;
+}
+
+.queue-message.success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.queue-message.error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.queue-message.warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* Batch Options */
+.batch-options {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.batch-option-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.batch-select,
+.batch-input {
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  min-width: 150px;
+}
+
+/* Batch Progress */
+.batch-progress {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--color-bg-light);
+  border-radius: var(--radius-md);
+  display: none;
+}
+
+.batch-progress.visible {
+  display: block;
+}
+
+.batch-progress-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.batch-progress-bar-container {
+  height: 8px;
+  background: var(--color-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.batch-progress-bar {
+  height: 100%;
+  background: var(--color-primary);
+  width: 0%;
+  transition: width var(--transition-fast);
+}
+
+/* Submit Batch Button */
+.btn-submit-batch {
+  width: 100%;
+  padding: 12px;
+  margin-top: 16px;
+  background: var(--color-primary);
+  color: var(--color-white);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.btn-submit-batch:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+.btn-submit-batch:disabled {
+  background: var(--color-border);
+  cursor: not-allowed;
+}
+
+/* Album Filter */
+.album-filter {
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  background: var(--color-white);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .lightbox-content {

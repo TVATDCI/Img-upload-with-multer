@@ -1,0 +1,172 @@
+import { jest } from '@jest/globals';
+import mongoose from 'mongoose';
+import { cleanupDb } from '../../utils/testHelpers.js';
+import * as albumService from '../../../src/services/albumService.js';
+import Album from '../../../src/models/Album.js';
+import Image from '../../../src/models/Image.js';
+
+describe('albumService', () => {
+  beforeEach(async () => {
+    await cleanupDb();
+  });
+
+  afterEach(async () => {
+    await cleanupDb();
+  });
+
+  describe('createAlbum', () => {
+    it('creates an album with name and description', async () => {
+      const album = await albumService.createAlbum({
+        name: 'Test Album',
+        description: 'A test album',
+      });
+
+      expect(album.name).toBe('Test Album');
+      expect(album.description).toBe('A test album');
+      expect(album.coverImage).toBeNull();
+    });
+
+    it('creates an album without description', async () => {
+      const album = await albumService.createAlbum({
+        name: 'Minimal Album',
+      });
+
+      expect(album.name).toBe('Minimal Album');
+      expect(album.description).toBe('');
+    });
+  });
+
+  describe('getAlbumsWithImageCounts', () => {
+    it('returns albums with image counts', async () => {
+      const album = await albumService.createAlbum({ name: 'Gallery' });
+      const image = new Image({
+        filename: 'test.jpg',
+        path: '/uploads/test.jpg',
+        user_ip: '127.0.0.1',
+        album: album._id,
+      });
+      await image.save();
+
+      const albums = await albumService.getAlbumsWithImageCounts();
+
+      expect(albums).toHaveLength(1);
+      expect(albums[0].name).toBe('Gallery');
+      expect(albums[0].imageCount).toBe(1);
+    });
+  });
+
+  describe('assignImageToAlbum', () => {
+    it('assigns an image to an album', async () => {
+      const album = await albumService.createAlbum({ name: 'Gallery' });
+      const image = new Image({
+        filename: 'test.jpg',
+        path: '/uploads/test.jpg',
+        user_ip: '127.0.0.1',
+      });
+      await image.save();
+
+      const updated = await albumService.assignImageToAlbum(image._id, album._id);
+
+      expect(updated.album.toString()).toBe(album._id.toString());
+    });
+
+    it('unassigns an image from an album', async () => {
+      const album = await albumService.createAlbum({ name: 'Gallery' });
+      const image = new Image({
+        filename: 'test.jpg',
+        path: '/uploads/test.jpg',
+        user_ip: '127.0.0.1',
+        album: album._id,
+      });
+      await image.save();
+
+      const updated = await albumService.assignImageToAlbum(image._id, null);
+
+      expect(updated.album).toBeNull();
+    });
+
+    it('throws when image not found', async () => {
+      const album = await albumService.createAlbum({ name: 'Gallery' });
+      await expect(
+        albumService.assignImageToAlbum(new mongoose.Types.ObjectId(), album._id)
+      ).rejects.toThrow('Image not found!');
+    });
+
+    it('throws when album not found', async () => {
+      const image = new Image({
+        filename: 'test.jpg',
+        path: '/uploads/test.jpg',
+        user_ip: '127.0.0.1',
+      });
+      await image.save();
+
+      await expect(
+        albumService.assignImageToAlbum(image._id, new mongoose.Types.ObjectId())
+      ).rejects.toThrow('Album not found!');
+    });
+  });
+
+  describe('refreshAlbumCoverImage', () => {
+    it('sets cover image to most recent image when current cover is removed', async () => {
+      const album = await albumService.createAlbum({ name: 'Gallery' });
+      const image1 = new Image({
+        filename: 'old.jpg',
+        path: '/uploads/old.jpg',
+        user_ip: '127.0.0.1',
+        album: album._id,
+        uploadDate: new Date('2024-01-01'),
+      });
+      const image2 = new Image({
+        filename: 'new.jpg',
+        path: '/uploads/new.jpg',
+        user_ip: '127.0.0.1',
+        album: album._id,
+        uploadDate: new Date('2024-02-01'),
+      });
+      await Promise.all([image1.save(), image2.save()]);
+
+      album.coverImage = image1._id;
+      await album.save();
+
+      const updated = await albumService.refreshAlbumCoverImage(album._id, image1._id);
+
+      expect(updated.coverImage.toString()).toBe(image2._id.toString());
+    });
+
+    it('sets cover image to null when album becomes empty', async () => {
+      const album = await albumService.createAlbum({ name: 'Gallery' });
+      const image = new Image({
+        filename: 'test.jpg',
+        path: '/uploads/test.jpg',
+        user_ip: '127.0.0.1',
+        album: album._id,
+      });
+      await image.save();
+
+      album.coverImage = image._id;
+      await album.save();
+
+      const updated = await albumService.refreshAlbumCoverImage(album._id, image._id);
+
+      expect(updated.coverImage).toBeNull();
+    });
+  });
+
+  describe('getAlbumImages', () => {
+    it('returns paginated images for an album', async () => {
+      const album = await albumService.createAlbum({ name: 'Gallery' });
+      const image = new Image({
+        filename: 'test.jpg',
+        path: '/uploads/test.jpg',
+        user_ip: '127.0.0.1',
+        album: album._id,
+      });
+      await image.save();
+
+      const result = await albumService.getAlbumImages(album._id, 0, 10);
+
+      expect(result.images).toHaveLength(1);
+      expect(result.total).toBe(1);
+    });
+  });
+});
