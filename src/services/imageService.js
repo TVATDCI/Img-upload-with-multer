@@ -39,7 +39,7 @@ async function extractLocalMetadata(localFilePath) {
   return metadata;
 }
 
-export const createImage = async ({ filename, originalName, localFilePath, size, user_ip, watermark = null }) => {
+export const createImage = async ({ filename, originalName, localFilePath, size, user_ip, watermark = null, albumId = null }) => {
   let publicId = null;
   let path = `/uploads/${filename}`;
   let dimensions = {};
@@ -114,6 +114,7 @@ export const createImage = async ({ filename, originalName, localFilePath, size,
     fileType,
     uploadDate: new Date(),
     user_ip,
+    album: albumId,
     variants,
     watermarked,
   });

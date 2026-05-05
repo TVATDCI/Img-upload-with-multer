@@ -738,8 +738,8 @@ form.addEventListener('submit', async (e) => {
         renderGallery(getFilteredImages());
         updateLoadMoreButton();
       } else {
-initUploadQueue();
-loadImages();
+        initUploadQueue();
+        loadImages();
       }
     } else {
       showMessage(data.error || 'Upload failed.', 'error');
@@ -926,6 +926,28 @@ imageGallery.addEventListener('click', async (e) => {
     editBtn.innerHTML = originalHtml;
   }
 });
+
+const modeSingleBtn = document.getElementById('mode-single');
+const modeBatchBtn = document.getElementById('mode-batch');
+const singleUploadPanel = document.getElementById('single-upload-panel');
+const batchUploadPanel = document.getElementById('batch-upload-panel');
+
+function switchUploadMode(mode) {
+  if (mode === 'single') {
+    modeSingleBtn.classList.add('active');
+    modeBatchBtn.classList.remove('active');
+    singleUploadPanel.classList.add('active');
+    batchUploadPanel.classList.remove('active');
+  } else {
+    modeSingleBtn.classList.remove('active');
+    modeBatchBtn.classList.add('active');
+    singleUploadPanel.classList.remove('active');
+    batchUploadPanel.classList.add('active');
+  }
+}
+
+modeSingleBtn?.addEventListener('click', () => switchUploadMode('single'));
+modeBatchBtn?.addEventListener('click', () => switchUploadMode('batch'));
 
 initUploadQueue();
 window.loadImages = loadImages;

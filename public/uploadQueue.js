@@ -198,6 +198,10 @@ async function submitBatch() {
     formData.append('watermark', watermarkInput.value.trim());
   }
 
+  if (albumSelect?.value) {
+    formData.append('album', albumSelect.value);
+  }
+
   try {
     const res = await fetch('/uploadImages', {
       method: 'POST',

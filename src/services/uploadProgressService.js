@@ -93,12 +93,19 @@ export const setJobStatus = (jobId, status) => {
     job.completedAt = Date.now();
   }
 
+  const overallPercent = job.totalFiles > 0
+    ? Math.round(
+        (job.files.reduce((sum, f) => sum + (f.progressPercent || 0), 0) / (job.totalFiles * 100)) * 100
+      )
+    : 0;
+
   broadcastEvent(jobId, status, {
     jobId,
     status,
     totalFiles: job.totalFiles,
     completedFiles: job.completedFiles,
     failedFiles: job.failedFiles,
+    overallPercent,
     files: job.files,
   });
 

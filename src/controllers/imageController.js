@@ -187,8 +187,9 @@ export const handleBatchUpload = async (req, res, next) => {
     }
 
     const watermark = req.body.watermark;
+    const album = req.body.album;
 
-    const result = await batchUploadService.createBatchUpload(req.files, req.ip, watermark);
+    const result = await batchUploadService.createBatchUpload(req.files, req.ip, watermark, album);
 
     if (result.status === 'rolled_back' || result.status === 'failed') {
       return error(res, 500, 'Batch upload failed and was rolled back');
@@ -233,13 +234,28 @@ export const getUploadProgress = async (req, res, next) => {
       uploadProgressService.removeClient(jobId, res);
     });
 
-    // If job is already completed, send completion event and close
     if (job.status === 'completed' || job.status === 'rolled_back') {
+      const overallPercent = job.totalFiles > 0
+        ? Math.round(
+            (job.files.reduce((sum, f) => sum + (f.progressPercent || 0), 0) / (job.totalFiles * 100)) * 100
+          )
+        : 0;
+
       setTimeout(() => {
         if (!res.writableEnded) {
+          res.write(`event: ${job.status}\n`);
+          res.write(`data: ${JSON.stringify({
+            jobId,
+            status: job.status,
+            totalFiles: job.totalFiles,
+            completedFiles: job.completedFiles,
+            failedFiles: job.failedFiles,
+            overallPercent,
+            files: job.files,
+          })}\n\n`);
           res.end();
         }
-      }, 1000);
+      }, 500);
     }
   } catch (err) {
     next(err);

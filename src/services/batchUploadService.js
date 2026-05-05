@@ -4,7 +4,7 @@ import { deleteFile } from '../utils/fileUtils.js';
 
 const MAX_BATCH_SIZE = 10;
 
-export const createBatchUpload = async (files, user_ip, watermark = null) => {
+export const createBatchUpload = async (files, user_ip, watermark = null, albumId = null) => {
   if (!Array.isArray(files) || files.length === 0) {
     throw new Error('No files provided');
   }
@@ -42,6 +42,7 @@ export const createBatchUpload = async (files, user_ip, watermark = null) => {
         size: file.size,
         user_ip,
         watermark,
+        albumId,
       });
 
       createdImages.push(image);
