@@ -16,7 +16,7 @@ export const env = {
     origin: process.env.ALLOWED_ORIGINS || '*',
   },
   jwt: {
-    secret: process.env.JWT_SECRET || 'fallback-secret-for-dev-only',
+    secret: process.env.JWT_SECRET,
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
   admin: {
