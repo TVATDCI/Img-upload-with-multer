@@ -171,6 +171,30 @@ npm start
 
 ---
 
+## Security Notice
+
+> **This is a student learning project.** The following security issues are **known and intentionally left unpatched** for educational purposes. Do not use this codebase as a reference for production security patterns without addressing these findings.
+
+A security audit (security-auditor v1.1.0) was run on 2026-05-07 and identified the following issues:
+
+### Critical (Known — Do Not Use in Production)
+- **Hardcoded credentials in `.env`** — MongoDB Atlas password, Cloudinary API key/secret are plaintext and weak. Rotate before any real deployment.
+- **Weak JWT secret** — `JWT_SECRET=super_secret_string` is easily guessable. Generate a cryptographically random secret for production.
+
+### Warnings (Known — Educational Only)
+- **No CSRF tokens** — Cookie auth without CSRF defense-in-depth. `SameSite=Strict` provides partial mitigation only.
+- **JWT not invalidated on logout** — Token remains valid for 7 days after logout. No server-side blacklist.
+- **CORS defaults to wildcard** — If `ALLOWED_ORIGINS` is missing, any origin can make credentialed requests.
+- **XSS via `innerHTML`** — User-controlled `displayName` injected into DOM without escaping (`public/app.js`).
+- **SSRF via URL check bypass** — `includes('cloudinary.com')` allows attacker-controlled subdomains.
+- **Uploads served without auth** — `/uploads/` is publicly accessible via `express.static`.
+- **Upload progress endpoint unauthenticated** — SSE stream at `/uploads/progress/:jobId` has no auth guard.
+
+### Fixed in v1.4.2
+- ~~JWT hardcoded fallback removed~~ — `src/config/index.js` no longer falls back to `'fallback-secret-for-dev-only'` if `JWT_SECRET` is missing.
+
+---
+
 ## License
 
 MIT
